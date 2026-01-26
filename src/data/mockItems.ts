@@ -1,0 +1,88 @@
+import { Item } from "@/components/ItemCard";
+
+export const mockItems: Item[] = [
+  {
+    id: "1",
+    title: "Black Leather Wallet",
+    description: "Lost my black leather wallet near the main library entrance. Contains ID and some cards.",
+    category: "Wallet",
+    location: "Main Library",
+    date: "Jan 20, 2024",
+    status: "lost",
+    imageUrl: "https://images.unsplash.com/photo-1627123424574-724758594e93?w=400&h=300&fit=crop",
+  },
+  {
+    id: "2",
+    title: "Silver MacBook Pro",
+    description: "Found a silver MacBook Pro in the cafeteria. Has a small sticker on the cover.",
+    category: "Electronics",
+    location: "Student Cafeteria",
+    date: "Jan 19, 2024",
+    status: "found",
+    imageUrl: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=400&h=300&fit=crop",
+  },
+  {
+    id: "3",
+    title: "Student ID Card",
+    description: "Found student ID card belonging to the Engineering department near Building C.",
+    category: "ID Card",
+    location: "Engineering Block",
+    date: "Jan 18, 2024",
+    status: "matched",
+    imageUrl: "https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=400&h=300&fit=crop",
+  },
+  {
+    id: "4",
+    title: "Blue Backpack",
+    description: "Lost blue Nike backpack with books and notebooks inside. Very important documents.",
+    category: "Bag",
+    location: "Sports Complex",
+    date: "Jan 17, 2024",
+    status: "lost",
+    imageUrl: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400&h=300&fit=crop",
+  },
+  {
+    id: "5",
+    title: "iPhone 14 Pro",
+    description: "Found an iPhone 14 Pro with a purple case near the parking lot entrance.",
+    category: "Electronics",
+    location: "Parking Lot A",
+    date: "Jan 16, 2024",
+    status: "found",
+    imageUrl: "https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=400&h=300&fit=crop",
+  },
+  {
+    id: "6",
+    title: "Prescription Glasses",
+    description: "Lost my prescription glasses in a black case. Has gold frames.",
+    category: "Accessories",
+    location: "Lecture Hall 3",
+    date: "Jan 15, 2024",
+    status: "lost",
+    imageUrl: "https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=400&h=300&fit=crop",
+  },
+];
+
+export const categories = [
+  "All Categories",
+  "Electronics",
+  "Wallet",
+  "Bag",
+  "ID Card",
+  "Accessories",
+  "Books",
+  "Keys",
+  "Other",
+];
+
+export const locations = [
+  "All Locations",
+  "Main Library",
+  "Student Cafeteria",
+  "Engineering Block",
+  "Sports Complex",
+  "Parking Lot A",
+  "Lecture Hall 3",
+  "Administration Building",
+  "Hostel Area",
+];
