@@ -1,22 +1,23 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Gift } from "lucide-react";
+import { CheckCircle } from "lucide-react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { categories, locations } from "@/data/mockItems";
 import { toast } from "sonner";
 
-import { addDoc, collection } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { checkForMatches } from "@/lib/matchService";
 import { useAuth } from "@/context/AuthContext";
 
 const ReportFound = () => {
+
   const navigate = useNavigate();
   const { user } = useAuth();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -25,23 +26,40 @@ const ReportFound = () => {
     location: "",
     date: "",
     contactEmail: "",
-    contactPhone: "",
+    contactPhone: ""
   });
 
-  /* IMAGE PREVIEW */
+  // ================= IMAGE CHANGE =================
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    if (!e.target.files) return;
+
+    const filesArray = Array.from(e.target.files);
+
+    if (filesArray.length > 5) {
+      toast.error("Maximum 5 images allowed");
+      return;
+    }
+
+    setSelectedFiles(filesArray);
+
+    const previewArray: string[] = [];
+
+    filesArray.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        previewArray.push(reader.result as string);
+        if (previewArray.length === filesArray.length) {
+          setImagePreviews(previewArray);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
-  /* SUBMIT */
+  // ================= SUBMIT =================
   const handleSubmit = async (e: React.FormEvent) => {
+
     e.preventDefault();
 
     if (!user) {
@@ -49,11 +67,18 @@ const ReportFound = () => {
       return;
     }
 
+    if (selectedFiles.length === 0) {
+      toast.error("Please upload at least one image");
+      return;
+    }
+
     try {
+
       setIsSubmitting(true);
 
-      /* ⭐ CREATE ITEM DATA */
-      const itemData = {
+      // ================= STEP 1 — SAVE TO FIRESTORE =================
+      const docRef = await addDoc(collection(db, "items"), {
+
         title: formData.title,
         description: formData.description,
         category: formData.category,
@@ -61,73 +86,109 @@ const ReportFound = () => {
         date: formData.date,
         contactEmail: formData.contactEmail,
         contactPhone: formData.contactPhone,
-        image: imagePreview || "",
+
+        files: selectedFiles.map(f => f.name),
+
+        imagePreview: imagePreviews[0],
+        imagePreviews: imagePreviews,
+        image: imagePreviews[0],
+        imageUrl: imagePreviews[0],
+
         status: "found",
         userId: user.uid,
-        createdAt: new Date()
-      };
-
-      /* ⭐ SAVE ITEM */
-      const docRef = await addDoc(collection(db, "items"), itemData);
-
-      /* ⭐ RUN MATCH CHECK */
-      await checkForMatches({
-        id: docRef.id,
-        ...itemData
+        createdAt: serverTimestamp()
       });
 
-      toast.success("Found item reported!", {
-        description: "Checking for lost item matches..."
-      });
+      console.log("🔥 Firestore Found Item ID:", docRef.id);
 
-      navigate("/browse");
+      // ================= STEP 2 — SEND IMAGE TO AI =================
+      const aiForm = new FormData();
+      aiForm.append("image", selectedFiles[0]);
+      aiForm.append("userId", user.uid);
+      aiForm.append("itemId", docRef.id);
+
+      // ⭐ PROFESSIONAL MATCHING FIX
+      aiForm.append("status", "found");
+
+      try {
+        const aiRes = await fetch("http://localhost:5000/match", {
+          method: "POST",
+          body: aiForm
+        });
+
+        if (!aiRes.ok) {
+          console.warn("AI Upload failed but item saved.");
+        } else {
+          const aiData = await aiRes.json();
+          console.log("🤖 AI Stored Found Item:", aiData);
+        }
+
+      } catch (aiError) {
+        console.warn("AI server not reachable:", aiError);
+      }
+
+      toast.success("Found item saved successfully!");
+
+      setTimeout(() => {
+        navigate(`/item/${docRef.id}`);
+      }, 1000);
 
     } catch (error) {
-      console.log("SAVE FOUND ERROR:", error);
-      toast.error("Failed to save item");
-    } finally {
+      console.error("Found Report Error:", error);
+      toast.error("Failed to submit found report");
+    }
+    finally {
       setIsSubmitting(false);
     }
   };
 
+  // ================= INPUT HANDLER =================
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  // ================= UI =================
   return (
     <div className="min-h-screen bg-background">
+
       <Header />
 
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4 max-w-3xl">
 
-          {/* HEADER */}
           <div className="text-center mb-12">
-            <div className="w-16 h-16 rounded-2xl bg-green-500/20 mx-auto mb-6 flex items-center justify-center">
-              <Gift className="w-8 h-8 text-green-500" />
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-green-500/20 mb-6">
+              <CheckCircle className="w-8 h-8 text-green-400" />
             </div>
 
             <h1 className="text-4xl font-bold mb-4">
-              REPORT <span className="text-green-500">FOUND</span> ITEM
+              REPORT <span className="text-green-400">FOUND</span> ITEM
             </h1>
+
+            <p className="text-muted-foreground">
+              Provide details about the found item.
+            </p>
           </div>
 
-          {/* FORM */}
-          <form onSubmit={handleSubmit} className="glass rounded-2xl p-8">
+          <form onSubmit={handleSubmit} className="rounded-2xl p-8">
 
             {/* IMAGE */}
             <div className="mb-8">
-              <label className="block mb-3">Item Photo</label>
+              <label className="block mb-3">Item Photos (Max 5)</label>
 
-              {imagePreview ? (
-                <img src={imagePreview} className="rounded-xl mb-4" />
+              {imagePreviews.length > 0 ? (
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  {imagePreviews.map((img, i) => (
+                    <img key={i} src={img} className="rounded-xl" />
+                  ))}
+                </div>
               ) : (
                 <label className="border-2 border-dashed p-8 block text-center cursor-pointer">
-                  Upload Image
+                  Upload Images
                   <input
                     type="file"
+                    multiple
                     accept="image/*"
-                    required
                     onChange={handleImageChange}
                     className="hidden"
                   />
@@ -135,7 +196,7 @@ const ReportFound = () => {
               )}
             </div>
 
-            {/* DETAILS */}
+            {/* FORM */}
             <div className="grid gap-4">
 
               <input
@@ -207,10 +268,12 @@ const ReportFound = () => {
             </button>
 
           </form>
+
         </div>
       </main>
 
       <Footer />
+
     </div>
   );
 };

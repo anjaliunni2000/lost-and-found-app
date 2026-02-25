@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Filter, X, Grid3X3 } from "lucide-react";
+import { Search } from "lucide-react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ItemCard from "@/components/ItemCard";
@@ -7,14 +7,14 @@ import ItemCard from "@/components/ItemCard";
 import { db } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
 
+import { motion, AnimatePresence } from "framer-motion";
+
 const Browse = () => {
 
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [selectedLocation, setSelectedLocation] = useState("All");
   const [selectedStatus, setSelectedStatus] = useState("all");
 
   // =========================
@@ -26,7 +26,6 @@ const Browse = () => {
 
   async function loadItems() {
     try {
-
       const snap = await getDocs(collection(db, "items"));
 
       const list = snap.docs.map(doc => ({
@@ -50,26 +49,32 @@ const Browse = () => {
   // =========================
   const filteredItems = items.filter(item => {
 
+    const search = searchQuery.toLowerCase();
+
+    const title = item.title?.toLowerCase() || "";
+    const description = item.description?.toLowerCase() || "";
+    const status = item.status?.toLowerCase() || "";
+
     const matchesSearch =
-      item.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description?.toLowerCase().includes(searchQuery.toLowerCase());
+      title.includes(search) ||
+      description.includes(search);
 
-    const matchesCategory =
-      selectedCategory === "All" ||
-      item.category === selectedCategory;
+    let matchesStatus = true;
 
-    const matchesLocation =
-      selectedLocation === "All" ||
-      item.location === selectedLocation;
+    if (selectedStatus === "lost") {
+      matchesStatus = status === "lost";
+    }
 
-    const matchesStatus =
-      selectedStatus === "all" ||
-      item.status === selectedStatus;
+    if (selectedStatus === "found") {
+      matchesStatus = status === "found";
+    }
 
-    return matchesSearch && matchesCategory && matchesLocation && matchesStatus;
-
+    return matchesSearch && matchesStatus;
   });
 
+  // =========================
+  // LOADING SCREEN
+  // =========================
   if (loading) {
     return (
       <div className="min-h-screen bg-background text-white flex items-center justify-center">
@@ -92,13 +97,13 @@ const Browse = () => {
             </h1>
           </div>
 
-          {/* SEARCH */}
+          {/* SEARCH + FILTER */}
           <div className="glass rounded-2xl p-4 mb-8">
+            <div className="flex gap-4 flex-col md:flex-row">
 
-            <div className="flex gap-4">
-
+              {/* SEARCH */}
               <div className="flex-1 relative">
-                <Search className="absolute left-4 top-3 text-gray-400"/>
+                <Search className="absolute left-4 top-3 text-gray-400" />
                 <input
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
@@ -107,18 +112,18 @@ const Browse = () => {
                 />
               </div>
 
+              {/* STATUS FILTER */}
               <select
                 value={selectedStatus}
                 onChange={e => setSelectedStatus(e.target.value)}
-                className="input-dark"
+                className="input-dark md:w-40"
               >
-                <option value="all">All</option>
-                <option value="lost">Lost</option>
-                <option value="found">Found</option>
+                <option value="all">All Items</option>
+                <option value="lost">Lost Only</option>
+                <option value="found">Found Only</option>
               </select>
 
             </div>
-
           </div>
 
           {/* COUNT */}
@@ -126,23 +131,34 @@ const Browse = () => {
             Showing <span className="text-primary">{filteredItems.length}</span> items
           </p>
 
-          {/* ITEMS GRID */}
+          {/* ========================= */}
+          {/* ⭐ ANIMATED ITEMS GRID */}
+          {/* ========================= */}
+
           {filteredItems.length > 0 ? (
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-
-              {filteredItems.map(item => (
-                <ItemCard key={item.id} item={item} />
-              ))}
-
-            </div>
-
+            <motion.div
+              layout
+              className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
+            >
+              <AnimatePresence>
+                {filteredItems.map(item => (
+                  <motion.div
+                    key={item.id}
+                    layout
+                    initial={{ opacity: 0, scale: 0.9, y: 40 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9, y: -40 }}
+                    transition={{ duration: 0.35 }}
+                  >
+                    <ItemCard item={item} />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </motion.div>
           ) : (
-
             <div className="text-center py-20">
               No items found
             </div>
-
           )}
 
         </div>

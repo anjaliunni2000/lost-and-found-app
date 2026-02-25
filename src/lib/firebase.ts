@@ -2,7 +2,8 @@ import { initializeApp } from "firebase/app";
 import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
-const firebaseConfig = {
+
+  const firebaseConfig = {
   apiKey: "AIzaSyA0MAbBcK02N2VdpqiPaYgGW5rfy_zhd1s",
   authDomain: "lost-and-found-app-3bad6.firebaseapp.com",
   projectId: "lost-and-found-app-3bad6",
@@ -13,7 +14,9 @@ const firebaseConfig = {
 };
 
 
-const app = initializeApp(firebaseConfig);
+
+export const app = initializeApp(firebaseConfig);
+
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);

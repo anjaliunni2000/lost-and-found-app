@@ -6,17 +6,18 @@ import Footer from "@/components/Footer";
 import { categories, locations } from "@/data/mockItems";
 import { toast } from "sonner";
 
-import { addDoc, collection } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 
 const ReportLost = () => {
+
   const navigate = useNavigate();
   const { user } = useAuth();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -28,22 +29,37 @@ const ReportLost = () => {
     contactPhone: "",
   });
 
-  /* IMAGE PREVIEW + STORE FILE */
+  // ================= IMAGE CHANGE =================
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
 
-    setSelectedFile(file);
+    if (!e.target.files) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    const filesArray = Array.from(e.target.files);
+
+    if (filesArray.length > 5) {
+      toast.error("Maximum 5 images allowed");
+      return;
+    }
+
+    setSelectedFiles(filesArray);
+
+    const previewArray: string[] = [];
+
+    filesArray.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        previewArray.push(reader.result as string);
+        if (previewArray.length === filesArray.length) {
+          setImagePreviews(previewArray);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
-  /* SUBMIT */
+  // ================= SUBMIT =================
   const handleSubmit = async (e: React.FormEvent) => {
+
     e.preventDefault();
 
     if (!user) {
@@ -51,16 +67,17 @@ const ReportLost = () => {
       return;
     }
 
-    if (!selectedFile) {
-      toast.error("Please upload image");
+    if (selectedFiles.length === 0) {
+      toast.error("Please upload at least one image");
       return;
     }
 
     try {
+
       setIsSubmitting(true);
 
-      // ⭐ 1️⃣ SAVE TO FIREBASE
-      await addDoc(collection(db, "items"), {
+      // ================= STEP 1 — SAVE TO FIRESTORE =================
+      const docRef = await addDoc(collection(db, "items"), {
         title: formData.title,
         description: formData.description,
         category: formData.category,
@@ -68,46 +85,71 @@ const ReportLost = () => {
         date: formData.date,
         contactEmail: formData.contactEmail,
         contactPhone: formData.contactPhone,
-        image: imagePreview || "",
+
+        files: selectedFiles.map(f => f.name),
+
+        imagePreview: imagePreviews[0],
+        imagePreviews: imagePreviews,
+        image: imagePreviews[0],
+        imageUrl: imagePreviews[0],
+
         status: "lost",
         userId: user.uid,
-        createdAt: new Date()
+        createdAt: serverTimestamp()
       });
 
-      // ⭐ 2️⃣ SEND IMAGE TO AI SERVER
-      const formDataAI = new FormData();
-      formDataAI.append("image", selectedFile);
+      console.log("🔥 Firestore Lost Item ID:", docRef.id);
 
-      const response = await fetch("http://localhost:5000/upload", {
-        method: "POST",
-        body: formDataAI
-      });
+      // ================= STEP 2 — SEND IMAGE TO AI =================
+      const aiForm = new FormData();
+      aiForm.append("image", selectedFiles[0]);
+      aiForm.append("userId", user.uid);
+      aiForm.append("itemId", docRef.id);
 
-      if (!response.ok) {
-        throw new Error("AI upload failed");
+      // ⭐ VERY IMPORTANT FOR PROFESSIONAL MATCHING
+      aiForm.append("status", "lost");
+
+      try {
+        const aiRes = await fetch("http://localhost:5000/match", {
+          method: "POST",
+          body: aiForm
+        });
+
+        if (!aiRes.ok) {
+          console.warn("AI Upload failed but item saved.");
+        } else {
+          const aiData = await aiRes.json();
+          console.log("🤖 AI Stored Lost Item:", aiData);
+        }
+
+      } catch (aiError) {
+        console.warn("AI server not reachable:", aiError);
       }
 
-      const aiResult = await response.json();
-      console.log("AI Stored:", aiResult);
+      toast.success("Lost item saved successfully!");
 
-      toast.success("Lost item saved + AI learned this item!");
-
-      navigate("/browse");
+      setTimeout(() => {
+        navigate(`/item/${docRef.id}`);
+      }, 1000);
 
     } catch (error) {
       console.error(error);
       toast.error("Failed to submit lost report");
-    } finally {
+    }
+    finally {
       setIsSubmitting(false);
     }
   };
 
+  // ================= INPUT HANDLER =================
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  // ================= UI =================
   return (
     <div className="min-h-screen bg-background">
+
       <Header />
 
       <main className="pt-24 pb-16">
@@ -131,15 +173,20 @@ const ReportLost = () => {
 
             {/* IMAGE */}
             <div className="mb-8">
-              <label className="block mb-3">Item Photo</label>
+              <label className="block mb-3">Item Photos (Max 5)</label>
 
-              {imagePreview ? (
-                <img src={imagePreview} className="rounded-xl mb-4" />
+              {imagePreviews.length > 0 ? (
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  {imagePreviews.map((img, i) => (
+                    <img key={i} src={img} className="rounded-xl" />
+                  ))}
+                </div>
               ) : (
                 <label className="border-2 border-dashed p-8 block text-center cursor-pointer">
-                  Upload Image
+                  Upload Images
                   <input
                     type="file"
+                    multiple
                     accept="image/*"
                     onChange={handleImageChange}
                     className="hidden"
@@ -148,7 +195,7 @@ const ReportLost = () => {
               )}
             </div>
 
-            {/* FORM FIELDS */}
+            {/* FORM */}
             <div className="grid gap-4">
 
               <input
@@ -220,10 +267,12 @@ const ReportLost = () => {
             </button>
 
           </form>
+
         </div>
       </main>
 
       <Footer />
+
     </div>
   );
 };

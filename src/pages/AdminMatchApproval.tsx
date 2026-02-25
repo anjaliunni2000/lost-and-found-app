@@ -2,197 +2,139 @@ import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
 import {
   collection,
-  getDocs,
-  doc,
-  updateDoc,
-  addDoc,
-  serverTimestamp,
   query,
-  where
+  where,
+  getDocs,
+  updateDoc,
+  doc
 } from "firebase/firestore";
+import { toast } from "sonner";
 
 export default function AdminMatchApproval() {
 
   const [matches, setMatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadMatches();
-  }, []);
-
-  function normalize(str: string) {
-    return str?.toLowerCase().replace(/[_-]/g, " ").trim();
-  }
-
-  async function loadMatches() {
+  // =============================
+  // FETCH MATCHES
+  // =============================
+  const fetchMatches = async () => {
     try {
+      const q = query(
+        collection(db, "matches"),
+        where("status", "==", "found")
+      );
 
-      const matchSnap = await getDocs(collection(db, "matches"));
-      const itemSnap = await getDocs(collection(db, "items"));
+      const snapshot = await getDocs(q);
 
-      const items = itemSnap.docs.map(d => ({
+      const data = snapshot.docs.map(d => ({
         id: d.id,
         ...d.data()
       }));
 
-      const merged = matchSnap.docs.map(m => {
-
-        const matchData = m.data();
-
-        // ⭐ MATCH BY itemId
-        let itemData = items.find(
-          (i: any) => i.id === matchData.itemId
-        );
-
-        // ⭐ FALLBACK NAME MATCH
-        if (!itemData) {
-          itemData = items.find((i: any) =>
-            normalize(i.title || "").includes(
-              normalize(matchData.itemName || "")
-            )
-          );
-        }
-
-        return {
-          id: m.id,
-          ...matchData,
-          item: itemData || null
-        };
-
-      });
-
-      setMatches(merged);
-
+      setMatches(data);
     } catch (err) {
-      console.log(err);
+      console.error(err);
+      toast.error("Failed to load matches");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    setLoading(false);
-  }
+  useEffect(() => {
+    fetchMatches();
+  }, []);
 
-  // ===============================
-  // ⭐ APPROVE MATCH + CREATE CHAT
-  // ===============================
-  async function approveMatch(match: any) {
-
+  // =============================
+  // APPROVE / REJECT
+  // =============================
+  const updateStatus = async (id: string, status: string) => {
     try {
-
-      // ⭐ 1. UPDATE MATCH STATUS
-      await updateDoc(doc(db, "matches", match.id), {
-        status: "approved"
+      await updateDoc(doc(db, "matches", id), {
+        status
       });
 
-      // ⭐ 2. UPDATE ITEM STATUS → FOUND
-      if (match.item?.id) {
-        await updateDoc(doc(db, "items", match.item.id), {
-          status: "found"
-        });
-      }
-
-      // ⭐ 3. PREVENT DUPLICATE CHAT
-      const chatQuery = query(
-        collection(db, "chats"),
-        where("itemId", "==", match.item?.id || "")
-      );
-
-      const existingChat = await getDocs(chatQuery);
-
-      if (existingChat.empty) {
-
-        // ⭐ 4. CREATE CHAT
-        await addDoc(collection(db, "chats"), {
-          participants: [
-            match.userId || "",             // finder
-            match.item?.userId || ""        // owner
-          ],
-          itemId: match.item?.id || "",
-          itemName: match.itemName || "",
-          createdAt: serverTimestamp()
-        });
-
-      }
-
-      loadMatches();
-
+      toast.success(`Match ${status}`);
+      fetchMatches();
     } catch (err) {
-      console.log("Approve Error:", err);
+      toast.error("Update failed");
     }
-  }
+  };
 
-  // ===============================
-  // ⭐ REJECT MATCH
-  // ===============================
-  async function rejectMatch(id: string) {
-    await updateDoc(doc(db, "matches", id), {
-      status: "rejected"
-    });
-    loadMatches();
+  // =============================
+  // UI
+  // =============================
+  if (loading) {
+    return <div className="p-10 text-white">Loading matches...</div>;
   }
-
-  if (loading)
-    return <div className="p-10 text-white">Loading...</div>;
 
   return (
-    <div className="p-10 text-white">
+    <div className="min-h-screen bg-[#020617] p-10 text-white">
 
       <h1 className="text-3xl font-bold mb-8">
-        Admin Match Approval Panel
+        Admin Match Approval
       </h1>
 
-      {matches.map(match => {
+      <div className="space-y-6">
 
-        const item = match.item;
+        {matches.map(match => (
 
-        return (
           <div
             key={match.id}
-            className="bg-black/40 p-6 rounded-xl mb-6 flex gap-6"
+            className="bg-slate-900 rounded-2xl p-6 flex gap-6 shadow-lg"
           >
 
-            {/* IMAGE */}
-            <div className="w-48">
-              {item?.image ? (
-                <img
-                  src={item.image}
-                  className="rounded-xl w-full h-40 object-cover"
-                />
-              ) : (
-                <div className="bg-gray-800 h-40 flex items-center justify-center rounded">
-                  No Image
-                </div>
-              )}
-            </div>
+            <div className="w-36 h-36 bg-slate-800 rounded-xl overflow-hidden flex items-center justify-center">
+  {match.file ? (
+    <img
+      src={`http://localhost:5000/database/${match.file}`}
+      className="w-full h-full object-cover"
+      onError={(e) => {
+        e.currentTarget.src = "/no-image.png";
+      }}
+    />
+  ) : (
+    <p className="text-slate-400">No Image</p>
+  )}
+</div>
 
             {/* DETAILS */}
             <div className="flex-1">
 
-              <h2 className="text-xl font-bold mb-2">
-                {item?.title || match.itemName}
+              <h2 className="text-xl font-semibold mb-2">
+                {match.itemName || match.label || "Unknown Item"}
               </h2>
 
-              <p>📍 Location: {item?.location || "N/A"}</p>
-              <p>📝 Description: {item?.description || "N/A"}</p>
-              <p>📧 Email: {item?.contactEmail || "N/A"}</p>
-              <p>📞 Phone: {item?.contactPhone || "N/A"}</p>
+              <div className="text-sm text-slate-300 space-y-1">
 
-              <p className="mt-2">
-                Confidence: {match.confidence || 0}%
-              </p>
+                <p>📍 Location: {match.location || "N/A"}</p>
+                <p>📝 Description: {match.description || "N/A"}</p>
+                <p>📧 Email: {match.email || "N/A"}</p>
+                <p>📞 Phone: {match.phone || "N/A"}</p>
 
-              <p>Status: {match.status || "pending"}</p>
+                <p className="mt-2 font-semibold text-cyan-400">
+                  Confidence: {match.confidence || 0}%
+                </p>
 
-              <div className="mt-4 flex gap-3">
+                <p className="text-green-400">
+                  Status: {match.status}
+                </p>
+
+              </div>
+
+              {/* ACTION BUTTONS */}
+              <div className="flex gap-3 mt-4">
 
                 <button
-                  onClick={() => approveMatch(match)}
-                  className="bg-green-600 px-4 py-2 rounded"
+                  onClick={() => updateStatus(match.id, "approved")}
+                  className="px-5 py-2 bg-green-600 rounded-lg hover:bg-green-500"
                 >
                   Approve
                 </button>
 
                 <button
-                  onClick={() => rejectMatch(match.id)}
-                  className="bg-red-600 px-4 py-2 rounded"
+                  onClick={() => updateStatus(match.id, "rejected")}
+                  className="px-5 py-2 bg-red-600 rounded-lg hover:bg-red-500"
                 >
                   Reject
                 </button>
@@ -202,8 +144,16 @@ export default function AdminMatchApproval() {
             </div>
 
           </div>
-        );
-      })}
+
+        ))}
+
+        {matches.length === 0 && (
+          <p className="text-slate-400">
+            No matches pending approval
+          </p>
+        )}
+
+      </div>
 
     </div>
   );

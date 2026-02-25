@@ -16,12 +16,10 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminMatches from "./pages/AdminMatches";
 import AdminMatchApproval from "./pages/AdminMatchApproval";
-import ChatList from "@/pages/ChatList";
-import ChatPage from "@/pages/ChatPage";
-
-
-
-
+import MatchResultPage from "@/pages/MatchResultPage";
+import MatchDetails from "./pages/MatchDetails";
+import HowItWorks from "./components/HowItWorks";
+import Privacy from "./pages/Privacy";
 
 
 const queryClient = new QueryClient();
@@ -36,31 +34,58 @@ export default function App() {
         <BrowserRouter>
           <Routes>
 
-            {/* Public */}
+            {/* ================= PUBLIC ROUTES ================= */}
+            <Route path="/" element={<Index />} />
+            <Route path="/browse" element={<Browse />} />
+            <Route path="/item/:id" element={<ItemDetail />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-
-            {/* Protected */}
-            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/browse" element={<ProtectedRoute><Browse /></ProtectedRoute>} />
-            <Route path="/report-lost" element={<ProtectedRoute><ReportLost /></ProtectedRoute>} />
-            <Route path="/report-found" element={<ProtectedRoute><ReportFound /></ProtectedRoute>} />
-            <Route path="/item/:id" element={<ProtectedRoute><ItemDetail /></ProtectedRoute>} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/matches" element={<AdminMatches />} />
-            <Route path="/admin/match-approval" element={<AdminMatchApproval />} />
-           <Route path="/chats" element={<ChatList />} />
-           <Route path="/chat/:chatId" element={<ChatPage />} />
+            <Route path="/browse" element={<Browse />} />
+<Route path="/report-lost" element={<ReportLost />} />
+<Route path="/report-found" element={<ReportFound />} />
+<Route path="/how-it-works" element={<HowItWorks />} />
+<Route path="/privacy" element={<Privacy />} />
+<Route path="/terms" element={<Privacy />} />
 
 
+            {/* ================= PROTECTED USER ROUTES ================= */}
+            <Route
+              path="/report-lost"
+              element={
+                <ProtectedRoute>
+                  <ReportLost />
+                </ProtectedRoute>
+              }
+            />
 
+            <Route
+              path="/report-found"
+              element={
+                <ProtectedRoute>
+                  <ReportFound />
+                </ProtectedRoute>
+              }
+            />
 
+           <Route
+  path="/match-result/:id"
+  element={
+    <ProtectedRoute>
+      <MatchResultPage />
+    </ProtectedRoute>
+  }
+/>
 
+            <Route
+              path="/match-details/:matchId"
+              element={
+                <ProtectedRoute>
+                  <MatchDetails />
+                </ProtectedRoute>
+              }
+            />
 
-
-
-
-            {/* Admin */}
+            {/* ================= ADMIN ROUTES ================= */}
             <Route
               path="/admin"
               element={
@@ -70,12 +95,29 @@ export default function App() {
               }
             />
 
-            {/* 404 */}
+            <Route
+              path="/admin/matches"
+              element={
+                <ProtectedRoute adminOnly={true}>
+                  <AdminMatches />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/admin/match-approval"
+              element={
+                <ProtectedRoute adminOnly={true}>
+                  <AdminMatchApproval />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ================= 404 ================= */}
             <Route path="*" element={<NotFound />} />
 
           </Routes>
         </BrowserRouter>
-
       </TooltipProvider>
     </QueryClientProvider>
   );

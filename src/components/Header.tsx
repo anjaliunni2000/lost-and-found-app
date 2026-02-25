@@ -1,5 +1,5 @@
-import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Zap, Shield, MessageCircle } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Menu, X, Zap, Shield, MessageCircle, Sparkles } from "lucide-react";
 import { useState, useEffect } from "react";
 import NotificationBell from "./NotificationBell";
 
@@ -13,6 +13,8 @@ const Header = () => {
   const [isAdmin, setIsAdmin] = useState(false);
 
   const location = useLocation();
+  const navigate = useNavigate();
+
   const auth = getAuth();
   const db = getFirestore();
 
@@ -98,18 +100,9 @@ const Header = () => {
               </Link>
             ))}
 
-            {/* ⭐ CHATS BUTTON */}
-            {user && (
-              <Link
-                to="/chats"
-                className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-secondary"
-              >
-                <MessageCircle className="w-4 h-4" />
-                Chats
-              </Link>
-            )}
+            
 
-            {/* ⭐ ADMIN BUTTON */}
+            {/* ⭐ ADMIN */}
             {isAdmin && (
               <Link
                 to="/admin"
@@ -120,7 +113,7 @@ const Header = () => {
               </Link>
             )}
 
-            {/* ⭐ AUTH SECTION */}
+            {/* ⭐ AUTH */}
             {!user ? (
               <div className="flex gap-3 ml-4">
                 <Link to="/login" className="text-sm font-medium">
@@ -153,7 +146,32 @@ const Header = () => {
               </div>
             )}
 
-            <NotificationBell />
+            {/* ⭐ NOTIFICATION + MATCH BUTTON GROUP */}
+            {user && (
+              <div className="flex items-center gap-3 ml-3">
+
+                <NotificationBell />
+
+                {/* ⭐ MATCH BUTTON */}
+                <button
+                  onClick={() => navigate("/match-result")}
+                  className="
+                    flex items-center gap-2
+                    px-4 py-2
+                    rounded-xl
+                    bg-gradient-to-r from-cyan-400 to-teal-500
+                    text-white text-sm font-semibold
+                    shadow-lg shadow-cyan-500/20
+                    hover:scale-105
+                    transition-all
+                  "
+                >
+                  <Sparkles size={16} />
+                  Match
+                </button>
+
+              </div>
+            )}
 
           </nav>
 
@@ -172,31 +190,19 @@ const Header = () => {
           <nav className="md:hidden py-4 border-t border-border">
 
             {navLinks.map(link => (
-              <Link
-                key={link.path}
-                to={link.path}
-                className="block px-4 py-3"
-              >
+              <Link key={link.path} to={link.path} className="block px-4 py-3">
                 {link.name}
               </Link>
             ))}
 
-            {/* ⭐ MOBILE CHATS */}
             {user && (
-              <Link
-                to="/chats"
-                className="block px-4 py-3 font-medium"
-              >
+              <Link to="/chats" className="block px-4 py-3 font-medium">
                 Chats
               </Link>
             )}
 
-            {/* ⭐ MOBILE ADMIN */}
             {isAdmin && (
-              <Link
-                to="/admin"
-                className="block px-4 py-3 text-primary font-medium"
-              >
+              <Link to="/admin" className="block px-4 py-3 text-primary font-medium">
                 Admin Dashboard
               </Link>
             )}
@@ -230,8 +236,17 @@ const Header = () => {
               </div>
             )}
 
-            <div className="px-4 mt-4">
+            <div className="px-4 mt-4 flex items-center gap-3">
               <NotificationBell />
+
+              {user && (
+                <button
+                  onClick={() => navigate("/match-result")}
+                  className="px-4 py-2 rounded-xl bg-cyan-500 text-white text-sm"
+                >
+                  Match
+                </button>
+              )}
             </div>
 
           </nav>
