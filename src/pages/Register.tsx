@@ -1,35 +1,28 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-
-import { auth, db } from "@/lib/firebase";
+import { Link, useNavigate } from "react-router-dom";
+import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
+import { auth, db } from "../lib/firebase";
 
 export default function Register() {
 
   const navigate = useNavigate();
 
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+  const [name,setName] = useState("");
+  const [email,setEmail] = useState("");
+  const [password,setPassword] = useState("");
+  const [showPassword,setShowPassword] = useState(false);
 
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading,setLoading] = useState(false);
+  const [emailSent,setEmailSent] = useState(false);
 
-  async function handleRegister(e: React.FormEvent) {
+  const handleRegister = async (e:any) => {
+
     e.preventDefault();
 
-    if (!name || !phone || !email || password.length < 6) {
-      setError("Please fill all fields. Password must be 6+ characters.");
-      return;
-    }
+    setLoading(true);
 
     try {
-      setLoading(true);
-      setError("");
 
       const userCredential = await createUserWithEmailAndPassword(
         auth,
@@ -37,138 +30,207 @@ export default function Register() {
         password
       );
 
-      const uid = userCredential.user.uid;
+      const user = userCredential.user;
 
-      await setDoc(doc(db, "users", uid), {
+      // SEND EMAIL VERIFICATION
+      await sendEmailVerification(user);
+
+      // SAVE USER DATA
+      await setDoc(doc(db,"users",user.uid),{
         name,
-        phone,
         email,
-        role: "user",
-        createdAt: serverTimestamp()
+        uid:user.uid,
+        verified:false
       });
 
-      navigate("/");
+      setEmailSent(true);
 
-    } catch (err: any) {
-      setError(err.message || "Registration failed");
-    } finally {
-      setLoading(false);
+    } catch(error:any) {
+
+      alert(error.message);
+
     }
-  }
 
-  return (
-    <div className="min-h-screen flex">
+    setLoading(false);
 
-      {/* LEFT SIDE - IMAGE SECTION */}
-      <div className="hidden lg:flex w-1/2 relative">
-        <img
-          src="https://images.unsplash.com/photo-1507679799987-c73779587ccf"
-          alt="Lost and Found Community"
-          className="absolute inset-0 w-full h-full object-cover"
-        />
+  };
 
-        <div className="absolute inset-0 bg-black/70"></div>
 
-        <div className="relative z-10 flex flex-col justify-center px-16 text-white">
-          <h1 className="text-5xl font-bold mb-6 leading-tight">
-            Join <br />
-            <span className="text-primary">Lost & Found</span>
-          </h1>
+  const resendVerification = async () => {
 
-          <p className="text-lg text-gray-300 max-w-md">
-            Create your account and help reconnect lost belongings
-            with their rightful owners. Be part of a caring community.
+    if(auth.currentUser){
+
+      await sendEmailVerification(auth.currentUser);
+
+      alert("Verification email sent again");
+
+    }
+
+  };
+
+
+  /* ---------------------------
+     EMAIL VERIFICATION SCREEN
+  ---------------------------- */
+
+  if(emailSent){
+
+    return(
+
+      <div className="flex items-center justify-center h-screen bg-[#020c1b]">
+
+        <div className="bg-[#071426] p-10 rounded-2xl border border-teal-400/30 text-center w-[420px]">
+
+          <h2 className="text-white text-2xl font-bold mb-4">
+            📧 Verify Your Email
+          </h2>
+
+          <p className="text-gray-400 mb-6">
+            A verification email has been sent to
+            <br />
+            <span className="text-teal-400">{email}</span>
           </p>
+
+          <p className="text-gray-500 text-sm mb-8">
+            Please check your inbox and click the verification link to activate your account.
+          </p>
+
+          <button
+            onClick={resendVerification}
+            className="w-full bg-teal-400 text-black py-3 rounded-lg font-semibold mb-4 hover:bg-teal-500"
+          >
+            Resend Verification Email
+          </button>
+
+          <button
+            onClick={()=>navigate("/login")}
+            className="w-full border border-teal-400 text-teal-400 py-3 rounded-lg hover:bg-teal-400 hover:text-black"
+          >
+            Go to Login
+          </button>
+
         </div>
+
       </div>
 
-      {/* RIGHT SIDE - REGISTER FORM */}
-      <div className="flex w-full lg:w-1/2 items-center justify-center bg-slate-950 text-white px-6">
+    )
 
-        <form
-          onSubmit={handleRegister}
-          autoComplete="off"
-          className="bg-slate-900 p-8 rounded-2xl w-full max-w-md shadow-2xl border border-primary/20"
-        >
+  }
 
-          <h2 className="text-3xl font-bold mb-6 text-center">
+
+  return (
+
+    <div className="flex h-screen w-full">
+
+      {/* LEFT SIDE BACKGROUND */}
+      <div className="w-1/2 h-screen relative">
+
+        <img
+          src="/robot-bg.png"
+          alt="AI Background"
+          className="w-full h-full object-cover"
+        />
+
+        <div className="absolute inset-0 bg-black/50 pointer-events-none"></div>
+
+        <div className="absolute inset-0 flex flex-col justify-center px-16 text-white">
+
+          <h1 className="text-5xl font-bold mb-4">
+            Welcome to
+            <br />
+            <span className="text-teal-400">Lost & Found</span>
+          </h1>
+
+          <p className="text-gray-300 text-lg max-w-md mb-6">
+            Reconnect people with what matters most. Report lost items,
+            discover found belongings, and help return them to their rightful owners.
+          </p>
+
+          <button
+            onClick={() => navigate("/")}
+            className="bg-teal-400 text-black px-6 py-3 rounded-lg font-semibold w-fit hover:bg-teal-500"
+          >
+            Explore Platform
+          </button>
+
+        </div>
+
+      </div>
+
+
+      {/* RIGHT REGISTER FORM */}
+      <div className="w-1/2 bg-[#020c1b] flex items-center justify-center">
+
+        <div className="bg-[#071426] p-10 rounded-2xl w-[420px] border border-teal-400/30 shadow-xl">
+
+          <h2 className="text-white text-2xl font-bold text-center mb-8">
             Create Account
           </h2>
 
-          {/* NAME */}
-          <input
-            name="full-name"
-            autoComplete="off"
-            placeholder="Full Name"
-            className="w-full mb-3 p-3 rounded-xl bg-slate-800"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
+          <form onSubmit={handleRegister}>
 
-          {/* PHONE */}
-          <input
-            type="tel"
-            name="phone-number"
-            autoComplete="off"
-            placeholder="Phone Number"
-            className="w-full mb-3 p-3 rounded-xl bg-slate-800"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-          />
-
-          {/* EMAIL */}
-          <input
-            type="email"
-            name="new-email"
-            autoComplete="new-email"
-            placeholder="Email"
-            className="w-full mb-3 p-3 rounded-xl bg-slate-800"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-
-          {/* PASSWORD */}
-          <div className="relative mb-4">
             <input
-              type={showPassword ? "text" : "password"}
-              name="new-password"
-              autoComplete="new-password"
-              placeholder="Password"
-              className="w-full p-3 rounded-xl bg-slate-800 pr-12"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              type="text"
+              placeholder="Full Name"
+              value={name}
+              onChange={(e)=>setName(e.target.value)}
+              className="w-full p-3 mb-4 rounded-lg bg-gray-200 outline-none"
+              required
             />
 
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e)=>setEmail(e.target.value)}
+              className="w-full p-3 mb-4 rounded-lg bg-[#0f1c2e] text-white outline-none"
+              required
+            />
+
+            <div className="relative mb-6">
+
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Password"
+                value={password}
+                onChange={(e)=>setPassword(e.target.value)}
+                className="w-full p-3 rounded-lg bg-[#0f1c2e] text-white outline-none pr-12"
+                required
+              />
+
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+              >
+                {showPassword ? "🙈" : "👁"}
+              </button>
+
+            </div>
+
             <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-3 text-gray-400"
+              type="submit"
+              disabled={loading}
+              className="w-full bg-teal-400 text-black py-3 rounded-lg font-semibold hover:bg-teal-500 transition"
             >
-              {showPassword ? "🙈" : "👁"}
+              {loading ? "Creating Account..." : "Register"}
             </button>
-          </div>
 
-          {error && (
-            <p className="text-red-400 mb-3 text-sm">{error}</p>
-          )}
+          </form>
 
-          <button
-            disabled={loading}
-            className="w-full bg-primary py-3 rounded-xl font-semibold disabled:opacity-50"
-          >
-            {loading ? "Creating Account..." : "Register"}
-          </button>
-
-          <p className="text-sm text-center mt-4">
-            Already have account?{" "}
-            <Link to="/login" className="text-primary hover:underline">
+          <p className="text-gray-400 text-center mt-6">
+            Already have an account?{" "}
+            <Link to="/login" className="text-teal-400">
               Login
             </Link>
           </p>
 
-        </form>
+        </div>
 
       </div>
+
     </div>
-  );
+
+  )
+
 }

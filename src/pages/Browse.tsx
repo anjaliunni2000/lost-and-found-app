@@ -1,172 +1,250 @@
-import { useState, useEffect } from "react";
-import { Search } from "lucide-react";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
-import ItemCard from "@/components/ItemCard";
+import { useEffect, useState } from "react";
+import { db, auth } from "@/lib/firebase";
+import { collection, getDocs, doc, getDoc } from "firebase/firestore";
+import { Search, Bell } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { signOut } from "firebase/auth";
 
-import { db } from "@/lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
-
-import { motion, AnimatePresence } from "framer-motion";
-
-const Browse = () => {
+export default function Browse() {
 
   const [items, setItems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [userInitials, setUserInitials] = useState("");
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState("all");
+  const navigate = useNavigate();
 
-  // =========================
-  // LOAD FIRESTORE ITEMS
-  // =========================
   useEffect(() => {
     loadItems();
+    loadUser();
   }, []);
 
   async function loadItems() {
-    try {
-      const snap = await getDocs(collection(db, "items"));
 
-      const list = snap.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+    const snap = await getDocs(collection(db, "items"));
 
-      console.log("🔥 FIRESTORE ITEMS:", list);
+    const data = snap.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
 
-      setItems(list);
-
-    } catch (err) {
-      console.log("Load error:", err);
-    }
-
-    setLoading(false);
+    setItems(data);
   }
 
-  // =========================
-  // FILTER ITEMS
-  // =========================
-  const filteredItems = items.filter(item => {
+  async function loadUser() {
 
-    const search = searchQuery.toLowerCase();
+    const user = auth.currentUser;
 
-    const title = item.title?.toLowerCase() || "";
-    const description = item.description?.toLowerCase() || "";
-    const status = item.status?.toLowerCase() || "";
+    if (!user) return;
 
-    const matchesSearch =
-      title.includes(search) ||
-      description.includes(search);
+    const userDoc = await getDoc(doc(db, "users", user.uid));
 
-    let matchesStatus = true;
+    if (userDoc.exists()) {
 
-    if (selectedStatus === "lost") {
-      matchesStatus = status === "lost";
+      const name = userDoc.data().name || "";
+
+      const initials = name
+        .split(" ")
+        .map((n: string) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2);
+
+      setUserInitials(initials);
+
     }
 
-    if (selectedStatus === "found") {
-      matchesStatus = status === "found";
-    }
+  }
 
-    return matchesSearch && matchesStatus;
+  async function handleLogout() {
+    await signOut(auth);
+    navigate("/login");
+  }
+
+  const filtered = items.filter((item:any) => {
+
+    const matchSearch =
+      item.title?.toLowerCase().includes(search.toLowerCase());
+
+    const matchFilter =
+      filter === "all" || item.status === filter;
+
+    return matchSearch && matchFilter;
   });
 
-  // =========================
-  // LOADING SCREEN
-  // =========================
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background text-white flex items-center justify-center">
-        Loading items...
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
 
-      <main className="pt-24 pb-16">
-        <div className="container mx-auto px-4">
+    <div className="min-h-screen bg-gradient-to-b from-[#020617] via-[#020617] to-[#03122a] text-white relative">
 
-          {/* HEADER */}
-          <div className="text-center mb-12">
-            <h1 className="text-5xl font-bold">
-              BROWSE <span className="text-primary">ITEMS</span>
-            </h1>
-          </div>
+      {/* HEADER */}
 
-          {/* SEARCH + FILTER */}
-          <div className="glass rounded-2xl p-4 mb-8">
-            <div className="flex gap-4 flex-col md:flex-row">
+      <header className="flex items-center justify-between px-10 py-4 border-b border-slate-800 bg-[#020617]/80 backdrop-blur-lg sticky top-0 z-50">
 
-              {/* SEARCH */}
-              <div className="flex-1 relative">
-                <Search className="absolute left-4 top-3 text-gray-400" />
-                <input
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="Search items..."
-                  className="w-full pl-10 input-dark"
-                />
-              </div>
+        {/* LOGO */}
 
-              {/* STATUS FILTER */}
-              <select
-                value={selectedStatus}
-                onChange={e => setSelectedStatus(e.target.value)}
-                className="input-dark md:w-40"
-              >
-                <option value="all">All Items</option>
-                <option value="lost">Lost Only</option>
-                <option value="found">Found Only</option>
-              </select>
+        <Link to="/" className="text-2xl font-bold text-emerald-400">
+          FIND<span className="text-white">IT</span>
+        </Link>
 
-            </div>
-          </div>
+        {/* NAVIGATION */}
 
-          {/* COUNT */}
-          <p className="mb-6 text-muted-foreground">
-            Showing <span className="text-primary">{filteredItems.length}</span> items
-          </p>
+        <nav className="flex items-center gap-6">
 
-          {/* ========================= */}
-          {/* ⭐ ANIMATED ITEMS GRID */}
-          {/* ========================= */}
+          <Link to="/" className="hover:text-emerald-400">
+            Home
+          </Link>
 
-          {filteredItems.length > 0 ? (
-            <motion.div
-              layout
-              className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
-            >
-              <AnimatePresence>
-                {filteredItems.map(item => (
-                  <motion.div
-                    key={item.id}
-                    layout
-                    initial={{ opacity: 0, scale: 0.9, y: 40 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, y: -40 }}
-                    transition={{ duration: 0.35 }}
-                  >
-                    <ItemCard item={item} />
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </motion.div>
-          ) : (
-            <div className="text-center py-20">
-              No items found
-            </div>
-          )}
+          <Link to="/browse" className="text-emerald-400 font-semibold">
+            Browse
+          </Link>
+
+          <Link to="/report-lost" className="hover:text-emerald-400">
+            Report Lost
+          </Link>
+
+          <Link to="/report-found" className="hover:text-emerald-400">
+            Report Found
+          </Link>
+
+        </nav>
+
+        {/* USER AREA */}
+
+        <div className="flex items-center gap-4">
+
+          {userInitials && (
+  <div className="w-9 h-9 rounded-full bg-emerald-400 flex items-center justify-center text-black font-bold">
+    {userInitials}
+  </div>
+)}
+
+          <button
+            onClick={handleLogout}
+            className="bg-emerald-500 hover:bg-emerald-600 px-4 py-2 rounded-lg text-black font-semibold"
+          >
+            Logout
+          </button>
+
+          <Bell className="text-gray-300"/>
 
         </div>
-      </main>
 
-      <Footer />
+      </header>
+
+
+      {/* AI GRID BACKGROUND */}
+
+      <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_1px_1px,#1f2937_1px,transparent_0)] bg-[size:40px_40px]"></div>
+
+      <div className="relative px-10 py-12">
+
+        {/* PAGE TITLE */}
+
+        <h1 className="text-5xl font-bold text-center mb-12 tracking-wide">
+          Browse <span className="text-emerald-400">Items</span>
+        </h1>
+
+
+        {/* SEARCH + FILTER */}
+
+        <div className="flex gap-4 mb-10 max-w-6xl mx-auto">
+
+          <div className="flex items-center gap-3 bg-slate-900 px-4 py-3 rounded-xl flex-1 border border-slate-800">
+
+            <Search size={18} className="text-gray-400"/>
+
+            <input
+              type="text"
+              placeholder="Search items..."
+              value={search}
+              onChange={(e)=>setSearch(e.target.value)}
+              className="bg-transparent outline-none w-full text-gray-200"
+            />
+
+          </div>
+
+          <select
+            value={filter}
+            onChange={(e)=>setFilter(e.target.value)}
+            className="bg-slate-900 border border-slate-800 px-5 py-3 rounded-xl"
+          >
+
+            <option value="all">All Items</option>
+            <option value="lost">Lost</option>
+            <option value="found">Found</option>
+
+          </select>
+
+        </div>
+
+
+        {/* ITEM GRID */}
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+
+          {filtered.map((item:any)=>(
+
+            <Link
+              key={item.id}
+              to={`/item/${item.id}`}
+              className="group bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 hover:border-emerald-400 transition hover:scale-[1.02]"
+            >
+
+              <div className="h-52 overflow-hidden relative">
+
+                <img
+                  src={item.imageUrl}
+                  alt={item.title}
+                  className="w-full h-full object-cover group-hover:scale-110 transition duration-300"
+                />
+
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+
+                <span
+                  className={`absolute top-3 left-3 text-xs px-3 py-1 rounded-full uppercase tracking-wide
+                  ${
+                    item.status === "lost"
+                      ? "bg-red-500"
+                      : "bg-green-500"
+                  }`}
+                >
+                  {item.status}
+                </span>
+
+              </div>
+
+              <div className="p-5">
+
+                <h3 className="text-lg font-semibold mb-1">
+                  {item.title}
+                </h3>
+
+                <p className="text-gray-400 text-sm">
+                  {item.location}
+                </p>
+
+              </div>
+
+            </Link>
+
+          ))}
+
+        </div>
+
+
+        {/* EMPTY STATE */}
+
+        {filtered.length === 0 && (
+
+          <div className="text-center mt-16 text-gray-400">
+            No items found
+          </div>
+
+        )}
+
+      </div>
+
     </div>
-  );
-};
 
-export default Browse;
+  );
+}

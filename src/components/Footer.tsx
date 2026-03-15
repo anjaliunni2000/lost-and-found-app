@@ -1,10 +1,11 @@
 import { Link, NavLink } from "react-router-dom";
-import { Zap, Github, Twitter, Mail } from "lucide-react";
+import { Zap } from "lucide-react";
 import { useState } from "react";
 import HelpModal from "@/components/HelpModal";
-
+import ContactModal from "./ContactModal";
 const Footer = () => {
   const [helpOpen, setHelpOpen] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
 
   return (
     <>
@@ -18,6 +19,7 @@ const Footer = () => {
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
                   <Zap className="w-5 h-5 text-background" />
                 </div>
+
                 <span className="font-bold text-xl tracking-wider">
                   <span className="text-primary">FIND</span>
                   <span className="text-foreground">IT</span>
@@ -34,11 +36,31 @@ const Footer = () => {
               <h4 className="text-sm tracking-wider text-primary mb-4">
                 NAVIGATION
               </h4>
+
               <ul className="space-y-3">
-                <li><NavLink to="/browse" className="hover:text-primary">Browse Items</NavLink></li>
-                <li><NavLink to="/report-lost" className="hover:text-primary">Report Lost</NavLink></li>
-                <li><NavLink to="/report-found" className="hover:text-primary">Report Found</NavLink></li>
-                <li><NavLink to="/how-it-works" className="hover:text-primary">How It Works</NavLink></li>
+                <li>
+                  <NavLink to="/browse" className="hover:text-primary">
+                    Browse Items
+                  </NavLink>
+                </li>
+
+                <li>
+                  <NavLink to="/report-lost" className="hover:text-primary">
+                    Report Lost
+                  </NavLink>
+                </li>
+
+                <li>
+                  <NavLink to="/report-found" className="hover:text-primary">
+                    Report Found
+                  </NavLink>
+                </li>
+
+                <li>
+                  <NavLink to="/how-it-works" className="hover:text-primary">
+                    How It Works
+                  </NavLink>
+                </li>
               </ul>
             </div>
 
@@ -47,6 +69,7 @@ const Footer = () => {
               <h4 className="text-sm tracking-wider text-primary mb-4">
                 SUPPORT
               </h4>
+
               <ul className="space-y-3">
 
                 {/* Help Center Popup */}
@@ -59,14 +82,14 @@ const Footer = () => {
                   </button>
                 </li>
 
-                {/* Contact Us → Scroll to Chat */}
+                {/* Contact Us Popup */}
                 <li>
-                  <a
-                    href="#admin-chat"
+                  <button
+                    onClick={() => setContactOpen(true)}
                     className="text-muted-foreground hover:text-primary transition"
                   >
                     Contact Us
-                  </a>
+                  </button>
                 </li>
 
                 <li>
@@ -89,6 +112,7 @@ const Footer = () => {
             <p className="text-muted-foreground text-sm">
               © 2026 FindIt
             </p>
+
             <div className="flex items-center gap-2 text-sm">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
               <span className="text-muted-foreground">System Online</span>
@@ -97,7 +121,9 @@ const Footer = () => {
         </div>
       </footer>
 
+      {/* Modals */}
       <HelpModal isOpen={helpOpen} onClose={() => setHelpOpen(false)} />
+      <ContactModal isOpen={contactOpen} onClose={() => setContactOpen(false)} />
     </>
   );
 };

@@ -1,239 +1,229 @@
-import React, { useState, useRef } from "react";
-import { motion } from "framer-motion";
-import { Upload, ScanLine } from "lucide-react";
-import { toast } from "sonner";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { getAuth } from "firebase/auth";
-import {
-  getFirestore,
-  addDoc,
-  collection,
-  serverTimestamp
-} from "firebase/firestore";
-
-import { notifyMatch } from "@/lib/matchNotifier";
-import { handleItemMatch } from "@/lib/matchingEngine";
+type MatchItem = {
+  id?: string;
+  itemId?: string;
+  lostItemId?: string;
+  foundItemId?: string;
+  finderId?: string;
+  title?: string;
+  description?: string;
+  score?: number;
+  confidence?: number;
+  image?: string;
+  imageUrl?: string;
+  photoURL?: string;
+  foundImage?: string;
+  foundLocation?: string;
+  location?: string;
+  finderEmail?: string;
+  email?: string;
+  finderPhone?: string;
+  phone?: string;
+};
 
 export default function AIMatchHome() {
-
   const navigate = useNavigate();
 
-  const [dragActive, setDragActive] = useState(false);
+  const [image, setImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [matches, setMatches] = useState<MatchItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [noMatchPopup, setNoMatchPopup] = useState(false);
 
-  const [showPopup, setShowPopup] = useState(false);
-  const [matchedItem, setMatchedItem] = useState<any>(null);
-
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  const normalize = (text?: string) => {
-    if (!text) return "unknown";
-    return text.toLowerCase().replace(/[_-]/g, " ").trim();
-  };
-
-  // ================= FILE HANDLING =================
-  const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") setDragActive(true);
-    if (e.type === "dragleave") setDragActive(false);
+  const handleFile = (file: File) => {
+    setImage(file);
+    setPreview(URL.createObjectURL(file));
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
     const file = e.dataTransfer.files?.[0];
-    if (file) processFile(file);
+    if (file) handleFile(file);
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) processFile(file);
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
   };
 
-  const processFile = (file: File) => {
-    if (loading) return;
-    setPreview(URL.createObjectURL(file));
-    runAIMatching(file);
-  };
-
-  // ================= MATCHING =================
-  const runAIMatching = async (file: File) => {
-
-    const auth = getAuth();
-    const db = getFirestore();
-    const userId = auth.currentUser?.uid;
-
-    if (!userId) {
-      toast.error("Login required");
+  const handleMatch = async () => {
+    if (!image && !title.trim() && !description.trim()) {
+      alert("Please upload image or enter details");
       return;
     }
 
+    const formData = new FormData();
+    if (image) formData.append("image", image);
+    formData.append("title", title.trim());
+    formData.append("description", description.trim());
+
     try {
-
       setLoading(true);
-      setResult(null);
+      setNoMatchPopup(false);
+      setMatches([]);
 
-      const formData = new FormData();
-      formData.append("image", file);
-      formData.append("userId", userId);
-
-      const res = await fetch("http://localhost:5000/match", {
+      const res = await fetch("http://127.0.0.1:8000/match", {
         method: "POST",
-        body: formData
+        body: formData,
       });
 
-      if (!res.ok) throw new Error("Backend match failed");
+      if (!res.ok) {
+        throw new Error(`Match request failed with status ${res.status}`);
+      }
 
       const data = await res.json();
-      setResult(data);
+      console.log("AI Match Result:", data);
+      console.log("Matches array:", data.matches);
 
-      if (data?.matches?.length > 0) {
+      const results: MatchItem[] = Array.isArray(data.matches) ? data.matches : [];
 
-        const detected = normalize(data.detected_object);
-        const bestMatch = data.matches[0];
-
-        notifyMatch(detected);
-
-        await addDoc(collection(db, "matches"), {
-          userId,
-          itemName: detected,
-          label: bestMatch?.label || detected,
-          confidence: bestMatch?.confidence_percent || 0,
-          status: "found",
-          file: bestMatch?.file || null,
-          ownerId: bestMatch?.ownerId || null,
-          itemId: bestMatch?.itemId || null,
-          createdAt: serverTimestamp()
-        });
-
-        await handleItemMatch(
-          userId,
-          bestMatch?.label,
-          (bestMatch?.confidence_percent || 0) / 100
-        );
-
-        setMatchedItem(bestMatch);
-        setShowPopup(true);
+      if (results.length === 0) {
+        setMatches([]);
+        setNoMatchPopup(true);
+        return;
       }
 
-      else {
-        toast.info("No matches found");
+      const sortedMatches = [...results].sort(
+        (a, b) =>
+          Number(b.score ?? b.confidence ?? 0) -
+          Number(a.score ?? a.confidence ?? 0)
+      );
 
-        await addDoc(collection(db, "matches"), {
-          userId,
-          itemName: normalize(data.detected_object),
-          label: data.detected_object || "Unknown",
-          confidence: 0,
-          status: "not_found",
-          file: null,
-          createdAt: serverTimestamp()
-        });
-      }
-
+      setMatches(sortedMatches.slice(0, 1));
     } catch (err) {
-      console.error("Matching Error:", err);
-      toast.error("Matching failed");
+      console.error("Matching error:", err);
+      alert("AI matching failed");
+      setMatches([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // ================= UI =================
+  const topMatch = matches[0];
+  const topMatchScore = Number(topMatch?.score ?? topMatch?.confidence ?? 0);
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 text-white">
+    <div className="w-full max-w-md mx-auto flex flex-col gap-4">
+      <input
+        type="text"
+        placeholder="Item name"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        className="px-4 py-3 rounded-lg bg-slate-800 border border-slate-700 text-white outline-none"
+      />
 
-      <h1 className="text-5xl font-bold mb-6">
-        Try AI Matching Now
-      </h1>
+      <textarea
+        placeholder="Describe your lost item"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        rows={4}
+        className="px-4 py-3 rounded-lg bg-slate-800 border border-slate-700 text-white outline-none resize-none"
+      />
 
-      <motion.div
-        onDragEnter={handleDrag}
-        onDragOver={handleDrag}
-        onDragLeave={handleDrag}
+      <div
         onDrop={handleDrop}
-        onClick={() => fileInputRef.current?.click()}
-        whileHover={{ scale: 1.02 }}
-        className={`relative w-full max-w-xl border-2 border-dashed rounded-3xl overflow-hidden cursor-pointer transition ${
-          dragActive ? "border-cyan-400 bg-cyan-400/10" : "border-slate-700"
-        }`}
-        style={{ minHeight: "280px" }}
+        onDragOver={handleDragOver}
+        className="border-2 border-dashed border-slate-600 rounded-xl p-6 text-center"
       >
+        {preview ? (
+          <img
+            src={preview}
+            alt="Preview"
+            className="mx-auto mb-3 max-h-40 rounded-lg object-contain"
+          />
+        ) : (
+          <p className="text-gray-400">Drag & drop image here or choose file</p>
+        )}
 
         <input
           type="file"
-          ref={fileInputRef}
-          onChange={handleFileSelect}
-          className="hidden"
           accept="image/*"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleFile(file);
+          }}
+          className="mt-3 text-white"
         />
+      </div>
 
-        {preview ? (
-          <img src={preview} className="absolute inset-0 w-full h-full object-cover" />
-        ) : (
-          <div className="flex flex-col items-center justify-center h-full">
-            <Upload size={48} />
-            <p className="mt-2">Upload Image</p>
-          </div>
-        )}
+      <button
+        onClick={handleMatch}
+        disabled={loading}
+        className={`py-3 rounded-xl text-black font-semibold transition ${
+          loading
+            ? "bg-slate-500 cursor-not-allowed"
+            : "bg-gradient-to-r from-emerald-400 to-cyan-400 hover:opacity-90"
+        }`}
+      >
+        {loading ? "AI Matching..." : "Upload & Match"}
+      </button>
 
-        {loading && (
-          <motion.div className="absolute inset-0 bg-black/60">
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <ScanLine className="animate-pulse text-cyan-400 mb-3" size={42} />
-              <p className="text-cyan-300">AI Scanning Image...</p>
-            </div>
-          </motion.div>
-        )}
+      {topMatch && (
+        <div className="mt-4 space-y-3">
+          <h3 className="text-lg font-bold text-emerald-400">Possible Match</h3>
 
-      </motion.div>
+          <div className="rounded-lg border border-emerald-400/20 bg-slate-900 p-4">
+            <p className="font-semibold text-white">{topMatch.title || "No title"}</p>
 
-      {/* MATCH SUCCESS POPUP */}
-      {showPopup && matchedItem && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-
-          <div className="bg-slate-900 p-10 rounded-3xl max-w-md text-center border border-cyan-500/30">
-
-            <h2 className="text-3xl font-bold text-cyan-400 mb-4">
-              🎉 Match Found!
-            </h2>
-
-            <p className="text-slate-300 mb-6">
-              Your item matched successfully
+            <p className="mt-2 text-sm text-gray-400">
+              {topMatch.description || "No description"}
             </p>
 
-            {matchedItem?.file && (
-              <img
-                src={`http://localhost:5000/database/${matchedItem.file}`}
-                className="h-40 mx-auto rounded-xl object-contain bg-slate-800 p-3 mb-6"
-              />
-            )}
-
-            <p className="text-cyan-300 mb-6">
-              Confidence: {matchedItem?.confidence_percent || 0}%
+            <p className="mt-3 font-semibold text-emerald-400">
+              Confidence: {topMatchScore.toFixed(2)}%
             </p>
 
             <button
               onClick={() => {
-                setShowPopup(false);
-                navigate(`/match-result/${matchedItem.itemId}`, {
-                  state: matchedItem
+                const itemId =
+                  topMatch.foundItemId ||
+                  topMatch.itemId ||
+                  topMatch.id ||
+                  topMatch.lostItemId;
+
+                console.log("TOP MATCH ITEM:", topMatch);
+                console.log("Navigating with itemId:", itemId);
+
+                if (!itemId) {
+                  alert("Matched item id not found");
+                  return;
+                }
+
+                navigate(`/finder-details/${itemId}`, {
+                  state: {
+                    match: topMatch,
+                  },
                 });
               }}
-              className="bg-cyan-500 hover:bg-cyan-400 px-8 py-3 rounded-xl font-semibold text-black"
+              className="mt-4 rounded-xl bg-emerald-400 px-5 py-3 font-semibold text-black hover:bg-emerald-500"
             >
-              View Result
+              View Details
             </button>
-
           </div>
-
         </div>
       )}
 
+      {noMatchPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="bg-slate-900 p-6 rounded-xl text-center max-w-sm border border-red-400/30">
+            <h2 className="text-xl font-bold text-red-400 mb-2">No Match Found</h2>
+
+            <p className="text-gray-400 mb-4">
+              We couldn't find any similar items.
+            </p>
+
+            <button
+              onClick={() => setNoMatchPopup(false)}
+              className="px-4 py-2 bg-emerald-400 text-black rounded-lg font-semibold"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

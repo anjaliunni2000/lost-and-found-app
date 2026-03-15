@@ -4,46 +4,46 @@ import { db } from "@/lib/firebase";
 import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
 import AdminSidebar from "@/components/AdminSidebar";
 
-export default function AdminItems() {
+export default function AdminUsers() {
 
   const navigate = useNavigate();
 
-  const [items, setItems] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadItems();
+    loadUsers();
   }, []);
 
-  async function loadItems() {
+  async function loadUsers() {
 
     setLoading(true);
 
-    const snap = await getDocs(collection(db, "items"));
+    const snap = await getDocs(collection(db, "users"));
 
     const data = snap.docs.map(d => ({
       id: d.id,
       ...d.data()
     }));
 
-    setItems(data);
+    setUsers(data);
 
     setLoading(false);
   }
 
-  async function deleteItem(id: string) {
+  async function deleteUser(id: string) {
 
-    if (!confirm("Delete this item?")) return;
+    if (!confirm("Delete this user?")) return;
 
-    await deleteDoc(doc(db, "items", id));
+    await deleteDoc(doc(db, "users", id));
 
-    loadItems();
+    loadUsers();
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-[#020617] text-white">
-        Loading Items...
+        Loading Users...
       </div>
     );
   }
@@ -64,24 +64,24 @@ export default function AdminItems() {
         </button>
 
         <h1 className="text-3xl font-bold mb-8">
-          Items
+          Users
         </h1>
 
         <div className="bg-black/40 rounded-lg p-6">
 
-          {items.map(item => (
+          {users.map(user => (
 
             <div
-              key={item.id}
+              key={user.id}
               className="flex justify-between border-b border-slate-800 py-3"
             >
 
               <div>
-                {item.title} — {item.status}
+                {user.email} — {user.role || "user"}
               </div>
 
               <button
-                onClick={() => deleteItem(item.id)}
+                onClick={() => deleteUser(user.id)}
                 className="bg-red-500 hover:bg-red-600 px-3 py-1 rounded"
               >
                 Delete

@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 
 import Index from "./pages/Index";
 import Browse from "./pages/Browse";
@@ -20,7 +20,17 @@ import MatchResultPage from "@/pages/MatchResultPage";
 import MatchDetails from "./pages/MatchDetails";
 import HowItWorks from "./components/HowItWorks";
 import Privacy from "./pages/Privacy";
-
+import Terms from "./pages/Terms";
+import Chat from "@/pages/Chat";
+import ClaimRequests from "./pages/ClaimRequests";
+import Chats from "./pages/Chats";
+import FinderDetails from "./pages/FinderDetails";
+import AIResults from "@/pages/AIResults";
+import AdminItems from "./pages/AdminItems";
+import AdminUsers from "./pages/AdminUsers";
+import AdminFeedback from "./pages/AdminFeedback";
+import VerifyEmail from "./pages/VerifyEmail";
+import ClaimItem from "@/pages/ClaimItem";
 
 const queryClient = new QueryClient();
 
@@ -31,93 +41,160 @@ export default function App() {
         <Toaster />
         <Sonner />
 
-        <BrowserRouter>
-          <Routes>
+        <Routes>
+          {/* PUBLIC */}
+          <Route path="/" element={<Index />} />
+          <Route path="/browse" element={<Browse />} />
+          <Route path="/item/:id" element={<ItemDetail />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/how-it-works" element={<HowItWorks />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/finder-details/:id" element={<FinderDetails />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/claim-item/:id" element={<ClaimItem />} />
 
-            {/* ================= PUBLIC ROUTES ================= */}
-            <Route path="/" element={<Index />} />
-            <Route path="/browse" element={<Browse />} />
-            <Route path="/item/:id" element={<ItemDetail />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/browse" element={<Browse />} />
-<Route path="/report-lost" element={<ReportLost />} />
-<Route path="/report-found" element={<ReportFound />} />
-<Route path="/how-it-works" element={<HowItWorks />} />
-<Route path="/privacy" element={<Privacy />} />
-<Route path="/terms" element={<Privacy />} />
+          {/* USER */}
+          <Route
+            path="/report-lost"
+            element={
+              <ProtectedRoute>
+                <ReportLost />
+              </ProtectedRoute>
+            }
+          />
 
+          <Route
+            path="/report-found"
+            element={
+              <ProtectedRoute>
+                <ReportFound />
+              </ProtectedRoute>
+            }
+          />
 
-            {/* ================= PROTECTED USER ROUTES ================= */}
-            <Route
-              path="/report-lost"
-              element={
-                <ProtectedRoute>
-                  <ReportLost />
-                </ProtectedRoute>
-              }
-            />
+          <Route
+            path="/match-result/:id"
+            element={
+              <ProtectedRoute>
+                <MatchResultPage />
+              </ProtectedRoute>
+            }
+          />
 
-            <Route
-              path="/report-found"
-              element={
-                <ProtectedRoute>
-                  <ReportFound />
-                </ProtectedRoute>
-              }
-            />
+          <Route
+            path="/match-details/:matchId"
+            element={
+              <ProtectedRoute>
+                <MatchDetails />
+              </ProtectedRoute>
+            }
+          />
 
-           <Route
-  path="/match-result/:id"
+          <Route
+  path="/chat/:userId"
   element={
     <ProtectedRoute>
-      <MatchResultPage />
+      <Chat />
     </ProtectedRoute>
   }
 />
 
-            <Route
-              path="/match-details/:matchId"
-              element={
-                <ProtectedRoute>
-                  <MatchDetails />
-                </ProtectedRoute>
-              }
-            />
+          <Route
+            path="/chat/:chatId"
+            element={
+              <ProtectedRoute>
+                <Chat />
+              </ProtectedRoute>
+            }
+          />
 
-            {/* ================= ADMIN ROUTES ================= */}
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute adminOnly={true}>
-                  <AdminDashboard />
-                </ProtectedRoute>
-              }
-            />
+          <Route
+            path="/claims"
+            element={
+              <ProtectedRoute>
+                <ClaimRequests />
+              </ProtectedRoute>
+            }
+          />
 
-            <Route
-              path="/admin/matches"
-              element={
-                <ProtectedRoute adminOnly={true}>
-                  <AdminMatches />
-                </ProtectedRoute>
-              }
-            />
+          <Route
+            path="/chats"
+            element={
+              <ProtectedRoute>
+                <Chats />
+              </ProtectedRoute>
+            }
+          />
 
-            <Route
-              path="/admin/match-approval"
-              element={
-                <ProtectedRoute adminOnly={true}>
-                  <AdminMatchApproval />
-                </ProtectedRoute>
-              }
-            />
+          <Route
+            path="/ai-results"
+            element={
+              <ProtectedRoute>
+                <AIResults />
+              </ProtectedRoute>
+            }
+          />
 
-            {/* ================= 404 ================= */}
-            <Route path="*" element={<NotFound />} />
+          {/* ADMIN */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
 
-          </Routes>
-        </BrowserRouter>
+          <Route
+            path="/admin/matches"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminMatches />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/match-approval"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminMatchApproval />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/items"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminItems />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/feedback"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminFeedback />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/users"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminUsers />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 404 */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
       </TooltipProvider>
     </QueryClientProvider>
   );

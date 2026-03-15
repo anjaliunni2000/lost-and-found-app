@@ -10,10 +10,17 @@ import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 
-const ReportFound = () => {
+import {
+  getStorage,
+  ref,
+  uploadBytes,
+  getDownloadURL,
+} from "firebase/storage";
 
+const ReportFound = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const storage = getStorage();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -26,12 +33,10 @@ const ReportFound = () => {
     location: "",
     date: "",
     contactEmail: "",
-    contactPhone: ""
+    contactPhone: "",
   });
 
-  // ================= IMAGE CHANGE =================
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-
     if (!e.target.files) return;
 
     const filesArray = Array.from(e.target.files);
@@ -43,23 +48,21 @@ const ReportFound = () => {
 
     setSelectedFiles(filesArray);
 
-    const previewArray: string[] = [];
+    const previewPromises = filesArray.map(
+      (file) =>
+        new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        })
+    );
 
-    filesArray.forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        previewArray.push(reader.result as string);
-        if (previewArray.length === filesArray.length) {
-          setImagePreviews(previewArray);
-        }
-      };
-      reader.readAsDataURL(file);
+    Promise.all(previewPromises).then((previews) => {
+      setImagePreviews(previews);
     });
   };
 
-  // ================= SUBMIT =================
   const handleSubmit = async (e: React.FormEvent) => {
-
     e.preventDefault();
 
     if (!user) {
@@ -73,95 +76,103 @@ const ReportFound = () => {
     }
 
     try {
-
       setIsSubmitting(true);
 
-      // ================= STEP 1 — SAVE TO FIRESTORE =================
-      const docRef = await addDoc(collection(db, "items"), {
+      const imageUrls: string[] = [];
 
-        title: formData.title,
-        description: formData.description,
+      for (const file of selectedFiles) {
+        const fileName = `${Date.now()}-${file.name}`;
+        const imageRef = ref(storage, `found-items/${user.uid}/${fileName}`);
+
+        await uploadBytes(imageRef, file);
+        const url = await getDownloadURL(imageRef);
+        imageUrls.push(url);
+      }
+
+      const primaryImage = imageUrls[0] || "";
+
+      const docRef = await addDoc(collection(db, "found_items"), {
+        title: formData.title.trim(),
+        description: formData.description.trim(),
         category: formData.category,
+
+        foundLocation: formData.location,
         location: formData.location,
+
+        foundDate: formData.date,
         date: formData.date,
-        contactEmail: formData.contactEmail,
-        contactPhone: formData.contactPhone,
 
-        files: selectedFiles.map(f => f.name),
+        finderEmail: formData.contactEmail.trim(),
+        contactEmail: formData.contactEmail.trim(),
+        email: formData.contactEmail.trim(),
 
-        imagePreview: imagePreviews[0],
-        imagePreviews: imagePreviews,
-        image: imagePreviews[0],
-        imageUrl: imagePreviews[0],
+        finderPhone: formData.contactPhone.trim(),
+        contactPhone: formData.contactPhone.trim(),
+        phone: formData.contactPhone.trim(),
+
+        image: primaryImage,
+        imageUrl: primaryImage,
+        photoURL: primaryImage,
+        foundImage: primaryImage,
+        imageUrls: imageUrls,
 
         status: "found",
         userId: user.uid,
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
       });
 
-      console.log("🔥 Firestore Found Item ID:", docRef.id);
+      console.log("Found item saved:", docRef.id);
+      console.log("Saved image URL:", primaryImage);
 
-      // ================= STEP 2 — SEND IMAGE TO AI =================
       const aiForm = new FormData();
       aiForm.append("image", selectedFiles[0]);
-      aiForm.append("userId", user.uid);
       aiForm.append("itemId", docRef.id);
-
-      // ⭐ PROFESSIONAL MATCHING FIX
       aiForm.append("status", "found");
+      aiForm.append("title", formData.title.trim());
+      aiForm.append("description", formData.description.trim());
+      aiForm.append("category", formData.category);
 
       try {
-        const aiRes = await fetch("http://localhost:5000/match", {
+        await fetch("http://127.0.0.1:8000/upload", {
           method: "POST",
-          body: aiForm
+          body: aiForm,
         });
-
-        if (!aiRes.ok) {
-          console.warn("AI Upload failed but item saved.");
-        } else {
-          const aiData = await aiRes.json();
-          console.log("🤖 AI Stored Found Item:", aiData);
-        }
-
-      } catch (aiError) {
-        console.warn("AI server not reachable:", aiError);
+      } catch (error) {
+        console.warn("AI indexing skipped:", error);
       }
 
-      toast.success("Found item saved successfully!");
+      toast.success("Found item reported successfully!");
 
       setTimeout(() => {
         navigate(`/item/${docRef.id}`);
       }, 1000);
-
     } catch (error) {
-      console.error("Found Report Error:", error);
+      console.error("Failed to submit found report:", error);
       toast.error("Failed to submit found report");
-    }
-    finally {
+    } finally {
       setIsSubmitting(false);
     }
   };
 
-  // ================= INPUT HANDLER =================
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
   };
 
-  // ================= UI =================
   return (
     <div className="min-h-screen bg-background">
-
       <Header />
 
       <main className="pt-24 pb-16">
-        <div className="container mx-auto px-4 max-w-3xl">
-
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-green-500/20 mb-6">
-              <CheckCircle className="w-8 h-8 text-green-400" />
+        <div className="container mx-auto max-w-3xl px-4">
+          <div className="mb-12 text-center">
+            <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-green-500/20">
+              <CheckCircle className="h-8 w-8 text-green-400" />
             </div>
 
-            <h1 className="text-4xl font-bold mb-4">
+            <h1 className="mb-4 text-4xl font-bold">
               REPORT <span className="text-green-400">FOUND</span> ITEM
             </h1>
 
@@ -171,66 +182,76 @@ const ReportFound = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="rounded-2xl p-8">
-
-            {/* IMAGE */}
             <div className="mb-8">
-              <label className="block mb-3">Item Photos (Max 5)</label>
+              <label className="mb-3 block">Item Photos (Max 5)</label>
 
-              {imagePreviews.length > 0 ? (
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  {imagePreviews.map((img, i) => (
-                    <img key={i} src={img} className="rounded-xl" />
-                  ))}
-                </div>
-              ) : (
-                <label className="border-2 border-dashed p-8 block text-center cursor-pointer">
-                  Upload Images
-                  <input
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="hidden"
-                  />
-                </label>
-              )}
+              <label className="block cursor-pointer rounded-xl border-2 border-dashed p-8 text-center">
+                {imagePreviews.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    {imagePreviews.map((img, i) => (
+                      <img
+                        key={i}
+                        src={img}
+                        alt={`Preview ${i + 1}`}
+                        className="h-40 w-full rounded-xl object-cover"
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <span>Upload Images</span>
+                )}
+
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                />
+              </label>
             </div>
 
-            {/* FORM */}
             <div className="grid gap-4">
-
               <input
                 placeholder="Item Name"
                 value={formData.title}
-                onChange={(e)=>handleInputChange("title", e.target.value)}
+                onChange={(e) => handleInputChange("title", e.target.value)}
                 className="input-dark"
                 required
               />
 
               <select
                 value={formData.category}
-                onChange={(e)=>handleInputChange("category", e.target.value)}
+                onChange={(e) => handleInputChange("category", e.target.value)}
                 className="input-dark"
                 required
               >
                 <option value="">Category</option>
-                {categories.map(c => <option key={c}>{c}</option>)}
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
               </select>
 
               <select
                 value={formData.location}
-                onChange={(e)=>handleInputChange("location", e.target.value)}
+                onChange={(e) => handleInputChange("location", e.target.value)}
                 className="input-dark"
                 required
               >
                 <option value="">Location</option>
-                {locations.map(l => <option key={l}>{l}</option>)}
+                {locations.map((l) => (
+                  <option key={l} value={l}>
+                    {l}
+                  </option>
+                ))}
               </select>
 
               <input
                 type="date"
                 value={formData.date}
-                onChange={(e)=>handleInputChange("date", e.target.value)}
+                onChange={(e) => handleInputChange("date", e.target.value)}
                 className="input-dark"
                 required
               />
@@ -238,7 +259,9 @@ const ReportFound = () => {
               <textarea
                 placeholder="Description"
                 value={formData.description}
-                onChange={(e)=>handleInputChange("description", e.target.value)}
+                onChange={(e) =>
+                  handleInputChange("description", e.target.value)
+                }
                 className="input-dark"
               />
 
@@ -246,7 +269,9 @@ const ReportFound = () => {
                 type="email"
                 placeholder="Contact Email"
                 value={formData.contactEmail}
-                onChange={(e)=>handleInputChange("contactEmail", e.target.value)}
+                onChange={(e) =>
+                  handleInputChange("contactEmail", e.target.value)
+                }
                 className="input-dark"
                 required
               />
@@ -254,26 +279,25 @@ const ReportFound = () => {
               <input
                 placeholder="Contact Phone"
                 value={formData.contactPhone}
-                onChange={(e)=>handleInputChange("contactPhone", e.target.value)}
+                onChange={(e) =>
+                  handleInputChange("contactPhone", e.target.value)
+                }
                 className="input-dark"
               />
-
             </div>
 
             <button
+              type="submit"
               disabled={isSubmitting}
-              className="w-full mt-6 bg-green-500 p-4 rounded-xl font-bold"
+              className="mt-6 w-full rounded-xl bg-green-500 p-4 font-bold text-black disabled:cursor-not-allowed disabled:opacity-70"
             >
               {isSubmitting ? "Saving..." : "Submit Found Report"}
             </button>
-
           </form>
-
         </div>
       </main>
 
       <Footer />
-
     </div>
   );
 };

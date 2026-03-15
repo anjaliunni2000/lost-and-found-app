@@ -1,36 +1,94 @@
 import smtplib
 from email.mime.text import MIMEText
 
-EMAIL = "yourgmail@gmail.com"
-APP_PASSWORD = "your_app_password"
+# =============================
+# EMAIL CONFIGURATION
+# =============================
 
-def send_match_email(to_email, item_name, location):
+EMAIL_ADDRESS = "anjaliunnikrishnan001@gmail.com"
+EMAIL_PASSWORD = "lbqfpokhwqggvafg"
 
-    subject = "Match Found For Your Lost Item!"
+
+# =============================
+# SEND VERIFICATION EMAIL
+# =============================
+def send_verification_email(user_email, token):
+
+    verification_link = f"http://localhost:5173/verify-email?token={token}&email={user_email}"
+
+    subject = "Verify Your Email - Lost & Found System"
 
     body = f"""
-    Good News!
+Hello,
 
-    A match was found for your lost item.
+Thank you for registering in the Lost & Found system.
 
-    Item: {item_name}
-    Location Found: {location}
+Please click the link below to verify your email:
 
-    Please login and verify.
-    """
+{verification_link}
+
+If you did not create this account, please ignore this email.
+
+Regards,
+Lost & Found AI System
+"""
 
     msg = MIMEText(body)
     msg["Subject"] = subject
-    msg["From"] = EMAIL
-    msg["To"] = to_email
+    msg["From"] = EMAIL_ADDRESS
+    msg["To"] = user_email
 
     try:
-        server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
-        server.login(EMAIL, APP_PASSWORD)
-        server.send_message(msg)
-        server.quit()
 
-        print("Email Sent Successfully")
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()
+            server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
+            server.send_message(msg)
+
+        print("Verification email sent successfully")
 
     except Exception as e:
-        print("Email Error:", e)
+        print("Email sending error:", e)
+
+
+# =============================
+# SEND MATCH NOTIFICATION EMAIL
+# =============================
+def send_match_email(user_email, item_title, score):
+
+    subject = "Possible Match Found for Your Lost Item"
+
+    body = f"""
+Hello,
+
+Good news!
+
+Our AI system has detected a possible match for your lost item.
+
+Item: {item_title}
+Confidence Score: {round(score*100,2)}%
+
+Please login to your Lost & Found account to view the match.
+
+http://localhost:5173
+
+Thank you,
+Lost & Found AI System
+"""
+
+    msg = MIMEText(body)
+    msg["Subject"] = subject
+    msg["From"] = EMAIL_ADDRESS
+    msg["To"] = user_email
+
+    try:
+
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()
+            server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
+            server.send_message(msg)
+
+        print("Match notification email sent successfully")
+
+    except Exception as e:
+        print("Match email error:", e)

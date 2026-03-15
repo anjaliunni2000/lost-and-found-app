@@ -4,46 +4,46 @@ import { db } from "@/lib/firebase";
 import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
 import AdminSidebar from "@/components/AdminSidebar";
 
-export default function AdminItems() {
+export default function AdminFeedback() {
 
   const navigate = useNavigate();
 
-  const [items, setItems] = useState<any[]>([]);
+  const [feedback, setFeedback] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadItems();
+    loadFeedback();
   }, []);
 
-  async function loadItems() {
+  async function loadFeedback() {
 
     setLoading(true);
 
-    const snap = await getDocs(collection(db, "items"));
+    const snap = await getDocs(collection(db, "feedback"));
 
     const data = snap.docs.map(d => ({
       id: d.id,
       ...d.data()
     }));
 
-    setItems(data);
+    setFeedback(data);
 
     setLoading(false);
   }
 
-  async function deleteItem(id: string) {
+  async function deleteFeedback(id: string) {
 
-    if (!confirm("Delete this item?")) return;
+    if (!confirm("Delete this feedback?")) return;
 
-    await deleteDoc(doc(db, "items", id));
+    await deleteDoc(doc(db, "feedback", id));
 
-    loadItems();
+    loadFeedback();
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-[#020617] text-white">
-        Loading Items...
+        Loading Feedback...
       </div>
     );
   }
@@ -64,25 +64,37 @@ export default function AdminItems() {
         </button>
 
         <h1 className="text-3xl font-bold mb-8">
-          Items
+          User Feedback
         </h1>
 
         <div className="bg-black/40 rounded-lg p-6">
 
-          {items.map(item => (
+          {feedback.map(fb => (
 
             <div
-              key={item.id}
-              className="flex justify-between border-b border-slate-800 py-3"
+              key={fb.id}
+              className="border-b border-slate-800 py-4 flex justify-between"
             >
 
               <div>
-                {item.title} — {item.status}
+
+                <p className="text-emerald-400 font-semibold">
+                  {fb.userEmail || "Unknown User"}
+                </p>
+
+                <p className="text-yellow-400">
+                  {fb.rating} ⭐
+                </p>
+
+                <p className="text-gray-300 mt-1">
+                  {fb.comment}
+                </p>
+
               </div>
 
               <button
-                onClick={() => deleteItem(item.id)}
-                className="bg-red-500 hover:bg-red-600 px-3 py-1 rounded"
+                onClick={() => deleteFeedback(fb.id)}
+                className="bg-red-500 hover:bg-red-600 px-3 py-1 rounded text-sm"
               >
                 Delete
               </button>

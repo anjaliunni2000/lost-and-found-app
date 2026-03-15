@@ -1,9 +1,8 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-
-
-  const firebaseConfig = {
+import { getStorage } from "firebase/storage";
+const firebaseConfig = {
   apiKey: "AIzaSyA0MAbBcK02N2VdpqiPaYgGW5rfy_zhd1s",
   authDomain: "lost-and-found-app-3bad6.firebaseapp.com",
   projectId: "lost-and-found-app-3bad6",
@@ -13,13 +12,20 @@ import { getFirestore } from "firebase/firestore";
   measurementId: "G-VH9WM1XVEC"
 };
 
-
-
-export const app = initializeApp(firebaseConfig);
-
+// Prevent duplicate Firebase initialization
+export const app = !getApps().length
+  ? initializeApp(firebaseConfig)
+  : getApp();
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+export const storage = getStorage(app);
 
-// Optional persistence
-setPersistence(auth, browserLocalPersistence).catch(console.error);
+// Enable auth persistence safely
+setPersistence(auth, browserLocalPersistence)
+  .then(() => {
+    console.log("Auth persistence enabled");
+  })
+  .catch((err) => {
+    console.error("Persistence error:", err);
+  });

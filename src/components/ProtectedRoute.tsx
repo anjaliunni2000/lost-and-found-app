@@ -1,31 +1,29 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
-export default function ProtectedRoute({
-  children,
-  adminOnly = false,
-}: {
+interface Props {
   children: React.ReactNode;
   adminOnly?: boolean;
-}) {
+}
+
+export default function ProtectedRoute({ children, adminOnly }: Props) {
 
   const { user, role, loading } = useAuth();
 
-  // Show loading spinner while auth is checking
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
-        <p className="text-lg animate-pulse">Checking authentication...</p>
+      <div className="min-h-screen flex items-center justify-center text-white">
+        Loading...
       </div>
     );
   }
 
-  // If not logged in → go to login
+  // Not logged in
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  // If admin route but not admin → go to home
+  // Admin route check
   if (adminOnly && role !== "admin") {
     return <Navigate to="/" replace />;
   }

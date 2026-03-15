@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { signInWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 import { useNavigate, Link } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 
 export default function Login() {
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -23,19 +23,57 @@ export default function Login() {
 
     try {
       setLoading(true);
-      await signInWithEmailAndPassword(auth, email, password);
-      navigate("/");
-    } catch (err) {
-      console.log(err);
+
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      console.log("Logged in UID:", user.uid);
+
+      if (!user.emailVerified) {
+        alert("Please verify your email before logging in. A verification email has been sent again.");
+        await sendEmailVerification(user);
+        setLoading(false);
+        return;
+      }
+
+      const userDocRef = doc(db, "users", user.uid);
+      const userDoc = await getDoc(userDocRef);
+
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+
+        if (!userData.verified) {
+          await updateDoc(userDocRef, {
+            verified: true,
+          });
+        }
+
+        const role = userData?.role;
+        console.log("User role:", role);
+
+        if (role === "admin") {
+          navigate("/admin");
+        } else {
+          navigate("/");
+        }
+      } else {
+        console.log("User document not found");
+        navigate("/");
+      }
+    } catch (error) {
+      console.error("Login error:", error);
       alert("Login failed. Please check your credentials.");
     } finally {
       setLoading(false);
     }
   }
 
+  const handleExplorePlatform = () => {
+    navigate("/");
+  };
+
   return (
     <div className="min-h-screen flex">
-
       {/* LEFT SIDE */}
       <div className="hidden lg:flex w-1/2 relative">
         <img
@@ -43,7 +81,8 @@ export default function Login() {
           alt="Lost and Found"
           className="absolute inset-0 w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-black/70"></div>
+
+        <div className="absolute inset-0 bg-black/70" />
 
         <div className="relative z-10 flex flex-col justify-center px-16 text-white">
           <h1 className="text-5xl font-bold mb-6 leading-tight">
@@ -57,9 +96,9 @@ export default function Login() {
             and make someone's day better.
           </p>
 
-          {/* 🔥 Explore Button Redirect */}
           <button
-            onClick={() => navigate("/")}
+            type="button"
+            onClick={handleExplorePlatform}
             className="bg-primary text-black px-6 py-3 rounded-xl font-semibold w-fit hover:opacity-90 transition"
           >
             Explore Platform
@@ -69,18 +108,15 @@ export default function Login() {
 
       {/* RIGHT SIDE */}
       <div className="flex w-full lg:w-1/2 items-center justify-center bg-background px-6">
-
         <form
           onSubmit={handleLogin}
           autoComplete="off"
           className="w-full max-w-md p-8 rounded-2xl border border-primary/20 bg-black/40 backdrop-blur-xl shadow-2xl"
         >
-
           <h1 className="text-3xl font-bold text-center mb-6 text-white">
             Hello Again 👋
           </h1>
 
-          {/* EMAIL */}
           <input
             type="email"
             name="login-email"
@@ -91,7 +127,6 @@ export default function Login() {
             className="w-full mb-4 p-3 rounded-xl input-dark"
           />
 
-          {/* PASSWORD */}
           <div className="relative mb-6">
             <input
               type={showPassword ? "text" : "password"}
@@ -108,11 +143,10 @@ export default function Login() {
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
             >
-              {showPassword ? <EyeOff size={20}/> : <Eye size={20}/>}
+              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
             </button>
           </div>
 
-          {/* LOGIN BUTTON */}
           <button
             type="submit"
             disabled={loading}
@@ -121,19 +155,13 @@ export default function Login() {
             {loading ? "Logging in..." : "Login"}
           </button>
 
-          {/* REGISTER LINK */}
           <p className="text-center text-sm text-gray-400 mt-6">
             New user?{" "}
-            <Link
-              to="/register"
-              className="text-primary hover:underline"
-            >
+            <Link to="/register" className="text-primary hover:underline">
               Create Account
             </Link>
           </p>
-
         </form>
-
       </div>
     </div>
   );
