@@ -19,7 +19,10 @@ from email_sender import send_verification_email, send_match_email, send_claim_e
 # -----------------------------
 # FIREBASE INITIALIZATION
 # -----------------------------
-cred = credentials.Certificate("serviceAccountKey.json")
+import os
+
+cred_path = "/etc/secrets/serviceAccountKey.json" if os.path.exists("/etc/secrets/serviceAccountKey.json") else "serviceAccountKey.json"
+cred = credentials.Certificate(cred_path)
 firebase_admin.initialize_app(cred)
 
 db = firestore.client()
