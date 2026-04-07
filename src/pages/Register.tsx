@@ -146,13 +146,6 @@ export default function Register() {
             discover found belongings, and help return them to their rightful owners.
           </p>
 
-          <button
-            onClick={() => navigate("/")}
-            className="bg-teal-400 text-black px-6 py-3 rounded-lg font-semibold w-fit hover:bg-teal-500"
-          >
-            Explore Platform
-          </button>
-
         </div>
 
       </div>
@@ -174,7 +167,7 @@ export default function Register() {
               placeholder="Full Name"
               value={name}
               onChange={(e)=>setName(e.target.value)}
-              className="w-full p-3 mb-4 rounded-lg bg-gray-200 outline-none"
+              className="w-full p-3 mb-4 rounded-lg bg-gray-200 outline-none text-black"
               required
             />
 

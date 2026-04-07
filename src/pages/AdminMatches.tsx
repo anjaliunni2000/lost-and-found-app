@@ -30,15 +30,22 @@ const AdminMatches = () => {
   useEffect(() => {
     const fetchMatches = async () => {
       try {
-        const snapshot = await getDocs(collection(db, "items"));
+        const [lostSnap, foundSnap] = await Promise.all([
+          getDocs(collection(db, "items")),
+          getDocs(collection(db, "found_items"))
+        ]);
 
-        const allItems: ItemType[] = snapshot.docs.map((doc) => ({
+        const lostItems: ItemType[] = lostSnap.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         })) as ItemType[];
 
-        const lostItems = allItems.filter((item) => item.status === "lost");
-        const foundItems = allItems.filter((item) => item.status === "found");
+        const foundItems: ItemType[] = foundSnap.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as ItemType[];
+
+        const allItems = [...lostItems, ...foundItems];
 
         const matchedPairs: MatchedPair[] = [];
         const usedLostIds = new Set<string>();

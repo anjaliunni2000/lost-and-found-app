@@ -1,4 +1,14 @@
-opencv-python
-tensorflow
+fastapi
+uvicorn
+python-multipart
+sentence-transformers
+scikit-learn
+Pillow
+torch
+torchvision
 numpy
-flask
+firebase-admin
+ftfy
+regex
+tqdm
+git+https://github.com/openai/CLIP.git

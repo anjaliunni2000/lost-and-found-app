@@ -13,7 +13,7 @@ from firebase_admin import credentials, firestore
 
 import uuid
 
-from email_sender import send_verification_email, send_match_email
+from email_sender import send_verification_email, send_match_email, send_claim_email
 
 
 # -----------------------------
@@ -87,7 +87,10 @@ def get_text_embedding(text):
 @app.post("/upload")
 async def upload_embedding(
     image: UploadFile = File(...),
-    itemId: str = Form(...)
+    itemId: str = Form(...),
+    status: str = Form("found"),
+    title: str = Form(""),
+    description: str = Form("")
 ):
     try:
         image_bytes = await image.read()
@@ -98,11 +101,74 @@ async def upload_embedding(
 
         embedding_list = image_embedding.tolist()
 
-        db.collection("items").document(itemId).update({
+        collection_name = "found_items" if status == "found" else "items"
+
+        db.collection(collection_name).document(itemId).update({
             "imageEmbedding": embedding_list
         })
 
-        print("Embedding stored for item:", itemId)
+        print("Embedding stored for item:", itemId, "in collection:", collection_name)
+
+        # ==========================================
+        # REVERSE MATCHING FOR FOUND ITEMS -> LOST UR
+        # ==========================================
+        if status == "found":
+            query_text = f"{title} {description}"
+            text_embedding = get_text_embedding(query_text)
+
+            lost_items = db.collection("items").stream()
+
+            for doc in lost_items:
+                item = doc.to_dict()
+
+                # MUST HAVE NOTIFICATION EMAIL
+                lost_user_email = item.get("userEmail") or item.get("contactEmail")
+                if not lost_user_email:
+                    continue
+
+                item_text = f"{item.get('title','')} {item.get('description','')}"
+                item_embedding = get_text_embedding(item_text)
+
+                text_score = cosine_similarity(
+                    [text_embedding],
+                    [item_embedding]
+                )[0][0]
+
+                image_score = 0
+                if item.get("imageEmbedding"):
+                    stored_embedding = np.array(item.get("imageEmbedding"))
+                    image_score = cosine_similarity(
+                        [image_embedding],
+                        [stored_embedding]
+                    )[0][0]
+                    final_score = (text_score * 0.3) + (image_score * 0.7)
+                else:
+                    final_score = text_score
+
+                if final_score > 0.20:
+                    try:
+                        send_match_email(
+                            lost_user_email,
+                            item.get("title", title),
+                            final_score
+                        )
+                        print(f"Reverse match email sent to {lost_user_email} (Score: {final_score})")
+
+                        # IN-APP NOTIFICATION PUSH
+                        lost_user_id = item.get("userId")
+                        if lost_user_id:
+                            db.collection("notifications").add({
+                                "userId": lost_user_id,
+                                "title": "Possible Match Found!",
+                                "message": f"A newly found item '{title}' might be your lost item!",
+                                "link": f"/finder-details/{itemId}",
+                                "read": False,
+                                "createdAt": firestore.SERVER_TIMESTAMP
+                            })
+                            print(f"In-app Notification sent to {lost_user_id}")
+                            
+                    except Exception as e:
+                        print("Email to lost user error:", e)
 
         return {"message": "Embedding stored successfully"}
 
@@ -134,8 +200,8 @@ async def match_item(
             image_bytes = await image.read()
             image_embedding = get_image_embedding(BytesIO(image_bytes))
 
-        # FETCH ALL ITEMS
-        items_docs = db.collection("items").where("status","==","found").stream()
+        # FETCH ALL FOUND ITEMS
+        items_docs = db.collection("found_items").stream()
 
         results = []
 
@@ -157,16 +223,17 @@ async def match_item(
             image_score = 0
 
             if image_embedding is not None and item.get("imageEmbedding"):
-
                 stored_embedding = np.array(item.get("imageEmbedding"))
 
                 image_score = cosine_similarity(
                     [image_embedding],
                     [stored_embedding]
                 )[0][0]
-
-            final_score = (text_score * 0.3) + (image_score * 0.7)
-
+                
+                final_score = (text_score * 0.3) + (image_score * 0.7)
+            else:
+                final_score = text_score
+                
             print("TEXT:", text_score, "IMAGE:", image_score, "FINAL:", final_score)
 
             if final_score > 0.20:
@@ -183,6 +250,7 @@ async def match_item(
 
                 results.append({
     "id": doc.id,   # IMPORTANT → this is used by React router
+    "userId": item.get("userId"), # This is the critically missing uploader Auth ID
     "title": item.get("title"),
     "description": item.get("description"),
     "image": item.get("imageUrl"),
@@ -191,7 +259,9 @@ async def match_item(
     "finderEmail": item.get("contactEmail"),
     "finderPhone": item.get("contactPhone"),
     "location": item.get("location"),
-    "date": item.get("date")
+    "date": item.get("date"),
+    "secretQuestion": item.get("secretQuestion"),
+    "secretAnswer": item.get("secretAnswer")
 })
         results.sort(key=lambda x: x["score"], reverse=True)
 
@@ -245,3 +315,16 @@ async def verify_email(email: str, token: str):
         "verified": False,
         "message": "Invalid verification link"
     }
+
+# =============================
+# SEND CLAIM NOTIFICATION
+# =============================
+@app.post("/send-claim-notification")
+async def send_claim_notification(email: str = Form(...), itemTitle: str = Form(...)):
+
+    try:
+        send_claim_email(email, itemTitle)
+        return {"message": "Claim notification email sent"}
+    except Exception as e:
+        print("CLAIM EMAIL ERROR:", e)
+        return {"error": "Email sending failed"}

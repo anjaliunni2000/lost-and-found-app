@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import FeedbackPopup from "@/components/FeedbackPopup";
 
 import { db } from "@/lib/firebase";
@@ -16,17 +16,26 @@ import {
 
 import { useAuth } from "@/context/AuthContext";
 
+import { Shield } from "lucide-react";
+
 export default function MatchResultPage() {
 
-  const { user } = useAuth();
+  const { user: authUser } = useAuth(); // Renamed to avoid conflict with local 'user' state
   const navigate = useNavigate();
+  const { matchId } = useParams();
   const location = useLocation();
-
-  const matchedItem: any = location.state;
+  const matchedItem = location.state?.matchedItem;
 
   const [finderDetails, setFinderDetails] = useState<any>(null);
-  const [showFeedback, setShowFeedback] = useState(false);
   const [loadingFinder, setLoadingFinder] = useState(true);
+
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [user, setUser] = useState<any>(null); // This seems to be a duplicate of authUser or intended for something else. Keeping as per instruction.
+
+  // Anti-fraud state
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [userAnswer, setUserAnswer] = useState("");
+  const [verificationError, setVerificationError] = useState("");
 
   // ================================
   // If page opened without state
@@ -53,7 +62,7 @@ export default function MatchResultPage() {
           return;
         }
 
-        const ref = doc(db, "items", matchedItem.itemId);
+        const ref = doc(db, "found_items", matchedItem.itemId);
         const snap = await getDoc(ref);
 
         if (snap.exists()) {
@@ -64,7 +73,9 @@ export default function MatchResultPage() {
             email: data.contactEmail || "Not provided",
             location: data.location || "Unknown",
             date: data.date || "Unknown",
-            finderId: data.userId || null
+            finderId: data.userId || null,
+            secretQuestion: data.secretQuestion,
+            secretAnswer: data.secretAnswer
           });
 
         }
@@ -101,49 +112,11 @@ export default function MatchResultPage() {
         return;
       }
 
-      // 🔎 Check if chat already exists
-      const q = query(
-        collection(db, "chats"),
-        where("itemId", "==", matchedItem.itemId),
-        where("ownerId", "==", user.uid),
-        where("finderId", "==", finderDetails.finderId)
-      );
-
-      const snap = await getDocs(q);
-
-      if (!snap.empty) {
-
-        const existingChat = snap.docs[0];
-
-        navigate(`/chat/${existingChat.id}`);
-        return;
-
-      }
-
-      // 🆕 Create new chat
-      const chatRef = await addDoc(collection(db, "chats"), {
-
-        itemId: matchedItem.itemId,
-
-        ownerId: user.uid,
-        ownerEmail: user.email || "",
-
-        finderId: finderDetails.finderId,
-        finderEmail: finderDetails.email || "",
-
-        createdAt: serverTimestamp(),
-        lastMessage: "",
-        lastMessageTime: serverTimestamp()
-
-      });
-
-      console.log("Chat created:", chatRef.id);
-
-      navigate(`/chat/${chatRef.id}`);
+      navigate(`/chat/user/${finderDetails.finderId}`);
 
     } catch (error) {
 
-      console.error("Chat creation failed:", error);
+      console.error("Chat initialization failed:", error);
       alert("Failed to open chat");
 
     }
@@ -155,7 +128,7 @@ export default function MatchResultPage() {
   // Image URL
   // ================================
   const imageUrl = matchedItem?.file
-    ? `http://localhost:5000/database/${matchedItem.file}`
+    ? `${import.meta.env.VITE_API_BASE_URL}/database/${matchedItem.file}`
     : null;
 
 
@@ -226,7 +199,13 @@ export default function MatchResultPage() {
         <div className="flex flex-col gap-3">
 
           <button
-            onClick={startChat}
+            onClick={() => {
+              if (finderDetails?.secretQuestion && finderDetails?.secretAnswer) {
+                setShowVerificationModal(true);
+              } else {
+                startChat();
+              }
+            }}
             className="bg-green-500 hover:bg-green-600 py-3 rounded-lg font-semibold"
           >
             💬 Chat with Finder
@@ -246,6 +225,64 @@ export default function MatchResultPage() {
         )}
 
       </div>
+
+      {showVerificationModal && finderDetails?.secretQuestion && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-emerald-400/20 bg-[#0b1530] p-8 text-white shadow-2xl">
+            <div className="flex justify-center mb-4">
+               <Shield className="w-12 h-12 text-emerald-400" />
+            </div>
+            <h2 className="mb-2 text-2xl font-bold text-center text-emerald-400">
+              Proof of Ownership
+            </h2>
+            <p className="mb-6 text-gray-400 text-sm text-center">
+              The Finder securely locked this item. You must answer their secret question to prove it's yours.
+            </p>
+
+            <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700 mb-6 text-left">
+              <span className="text-xs text-emerald-500 font-bold uppercase tracking-wider">Secret Question</span>
+              <p className="text-white mt-1 text-lg font-medium">{finderDetails.secretQuestion}</p>
+            </div>
+
+            <input
+              type="text"
+              placeholder="Enter Exact Answer..."
+              value={userAnswer}
+              onChange={(e) => {
+                setUserAnswer(e.target.value);
+                setVerificationError("");
+              }}
+              className="w-full rounded-xl bg-slate-900 border border-slate-700 p-4 text-white focus:border-emerald-400 focus:outline-none mb-2"
+            />
+            
+            {verificationError && (
+              <p className="text-red-400 text-sm mb-4 text-center animate-pulse">{verificationError}</p>
+            )}
+
+            <div className="flex gap-3 mt-6">
+               <button
+                  onClick={() => setShowVerificationModal(false)}
+                  className="flex-1 rounded-xl bg-slate-700 py-3 font-semibold text-white transition hover:bg-slate-600"
+                >
+                  Cancel
+               </button>
+               <button
+                 onClick={() => {
+                   if (userAnswer.trim().toLowerCase() === finderDetails.secretAnswer?.toLowerCase()) {
+                     setShowVerificationModal(false);
+                     startChat();
+                   } else {
+                     setVerificationError("Incorrect answer. Please try again.");
+                   }
+                 }}
+                 className="flex-1 rounded-xl bg-emerald-400 py-3 font-bold text-black transition hover:bg-emerald-500"
+               >
+                 Verify Answer
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
 

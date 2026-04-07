@@ -1,30 +1,32 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
-interface Props {
+type ProtectedRouteProps = {
   children: React.ReactNode;
   adminOnly?: boolean;
-}
+};
 
-export default function ProtectedRoute({ children, adminOnly }: Props) {
-
-  const { user, role, loading } = useAuth();
+export default function ProtectedRoute({
+  children,
+  adminOnly = false,
+}: ProtectedRouteProps) {
+  const { user, loading } = useAuth();
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-white">
+      <div className="flex min-h-screen items-center justify-center bg-[#020617] text-white">
         Loading...
       </div>
     );
   }
 
-  // Not logged in
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  // Admin route check
-  if (adminOnly && role !== "admin") {
+  const adminEmails = ["admin123@yopmail.com"];
+
+  if (adminOnly && !adminEmails.includes(user.email || "")) {
     return <Navigate to="/" replace />;
   }
 

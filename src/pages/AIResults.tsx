@@ -5,7 +5,17 @@ const AIResults = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const matches = location.state?.matches || [];
+  let matches = location.state?.matches || [];
+
+  // Smart filter: Only show items matching the top AI prediction category
+  if (matches.length > 0) {
+    const topMatch = matches[0].title?.toLowerCase() || "";
+    if (topMatch.includes("phone") || topMatch.includes("mobile")) {
+      matches = matches.filter((m:any) => m.title?.toLowerCase().includes("phone") || m.title?.toLowerCase().includes("mobile"));
+    } else if (topMatch.includes("laptop")) {
+      matches = matches.filter((m:any) => m.title?.toLowerCase().includes("laptop"));
+    }
+  }
 
   return (
 

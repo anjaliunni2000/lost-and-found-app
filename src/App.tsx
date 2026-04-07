@@ -15,13 +15,12 @@ import Register from "./pages/Register";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminMatches from "./pages/AdminMatches";
-import AdminMatchApproval from "./pages/AdminMatchApproval";
+
 import MatchResultPage from "@/pages/MatchResultPage";
 import MatchDetails from "./pages/MatchDetails";
 import HowItWorks from "./components/HowItWorks";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
-import Chat from "@/pages/Chat";
 import ClaimRequests from "./pages/ClaimRequests";
 import Chats from "./pages/Chats";
 import FinderDetails from "./pages/FinderDetails";
@@ -29,6 +28,7 @@ import AIResults from "@/pages/AIResults";
 import AdminItems from "./pages/AdminItems";
 import AdminUsers from "./pages/AdminUsers";
 import AdminFeedback from "./pages/AdminFeedback";
+import AdminResolutions from "./pages/AdminResolutions";
 import VerifyEmail from "./pages/VerifyEmail";
 import ClaimItem from "@/pages/ClaimItem";
 
@@ -93,19 +93,19 @@ export default function App() {
           />
 
           <Route
-  path="/chat/:userId"
-  element={
-    <ProtectedRoute>
-      <Chat />
-    </ProtectedRoute>
-  }
-/>
+            path="/chat/user/:userId"
+            element={
+              <ProtectedRoute>
+                <Chats />
+              </ProtectedRoute>
+            }
+          />
 
           <Route
             path="/chat/:chatId"
             element={
               <ProtectedRoute>
-                <Chat />
+                <Chats />
               </ProtectedRoute>
             }
           />
@@ -148,6 +148,15 @@ export default function App() {
           />
 
           <Route
+            path="/admin/resolutions"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminResolutions />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/admin/matches"
             element={
               <ProtectedRoute adminOnly>
@@ -156,14 +165,7 @@ export default function App() {
             }
           />
 
-          <Route
-            path="/admin/match-approval"
-            element={
-              <ProtectedRoute adminOnly>
-                <AdminMatchApproval />
-              </ProtectedRoute>
-            }
-          />
+
 
           <Route
             path="/admin/items"

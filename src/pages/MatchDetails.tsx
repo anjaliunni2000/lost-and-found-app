@@ -25,7 +25,7 @@ export default function MatchDetails() {
     src={
       item.image.startsWith("http")
         ? item.image
-        : `http://localhost:8000${item.image}`
+        : `${import.meta.env.VITE_API_BASE_URL}${item.image}`
     }
     className="w-full h-52 object-cover rounded-lg mb-4"
     alt={item.title}

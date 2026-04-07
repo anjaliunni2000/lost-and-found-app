@@ -1,61 +1,67 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged, User } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  ReactNode,
+} from "react";
+import { onAuthStateChanged, User, signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
-interface AuthContextType {
+type AuthContextType = {
   user: User | null;
-  role: string | null;
   loading: boolean;
-}
+  logout: () => Promise<void>;
+};
 
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  role: null,
-  loading: true,
-});
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log("Auth state changed:", firebaseUser);
 
-      if (firebaseUser) {
-
-        setUser(firebaseUser);
-
-        const docRef = doc(db, "users", firebaseUser.uid);
-        const snap = await getDoc(docRef);
-
-        if (snap.exists()) {
-          setRole(snap.data().role);
-        }
-
-      } else {
-
-        setUser(null);
-        setRole(null);
-
-      }
-
+      setUser(firebaseUser);
       setLoading(false);
-
     });
 
     return () => unsubscribe();
-
   }, []);
 
-  return (
-    <AuthContext.Provider value={{ user, role, loading }}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      setUser(null);
+    } catch (error) {
+      console.error("Logout error:", error);
+      throw error;
+    }
+  };
 
-export const useAuth = () => useContext(AuthContext);
+  const value = useMemo(
+    () => ({
+      user,
+      loading,
+      logout,
+    }),
+    [user, loading]
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+
+  return context;
+}

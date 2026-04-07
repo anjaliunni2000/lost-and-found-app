@@ -13,6 +13,7 @@ export type Item = {
   image?: string;
   imageUrl?: string;
   matchApproved?: boolean;
+  userId?: string;
 };
 
 interface ItemCardProps {
@@ -34,7 +35,8 @@ const ItemCard = ({ item, showChat }: ItemCardProps) => {
     e.preventDefault();
     e.stopPropagation();
 
-    navigate(`/chat/${item.id}`);
+    // Prefer navigating to the creator's userId for peer-to-peer chat
+    navigate(`/chat/user/${item.userId || item.id}`);
   };
 
   const statusLabel =

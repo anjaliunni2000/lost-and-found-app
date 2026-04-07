@@ -28,37 +28,40 @@ export default function Login() {
       const user = userCredential.user;
 
       console.log("Logged in UID:", user.uid);
+      console.log("Logged in email:", user.email);
 
       if (!user.emailVerified) {
-        alert("Please verify your email before logging in. A verification email has been sent again.");
         await sendEmailVerification(user);
-        setLoading(false);
+        alert("Please verify your email before logging in. A verification email has been sent again.");
         return;
       }
 
       const userDocRef = doc(db, "users", user.uid);
-      const userDoc = await getDoc(userDocRef);
+      const userDocSnap = await getDoc(userDocRef);
 
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-
-        if (!userData.verified) {
-          await updateDoc(userDocRef, {
-            verified: true,
-          });
-        }
-
-        const role = userData?.role;
-        console.log("User role:", role);
-
-        if (role === "admin") {
-          navigate("/admin");
-        } else {
-          navigate("/");
-        }
-      } else {
+      if (!userDocSnap.exists()) {
         console.log("User document not found");
-        navigate("/");
+        alert("User profile not found in database.");
+        return;
+      }
+
+      const userData = userDocSnap.data();
+      const role = userData?.role || "";
+
+      console.log("User role from Firestore:", role);
+
+      if (!userData?.verified) {
+        await updateDoc(userDocRef, {
+          verified: true,
+        });
+      }
+
+      if (role === "admin" || user.email === "admin123@yopmail.com") {
+        console.log("Navigating to admin dashboard");
+        navigate("/admin", { replace: true });
+      } else {
+        console.log("Navigating to user dashboard");
+        navigate("/", { replace: true });
       }
     } catch (error) {
       console.error("Login error:", error);
@@ -68,13 +71,10 @@ export default function Login() {
     }
   }
 
-  const handleExplorePlatform = () => {
-    navigate("/");
-  };
+  // Button removed.
 
   return (
     <div className="min-h-screen flex">
-      {/* LEFT SIDE */}
       <div className="hidden lg:flex w-1/2 relative">
         <img
           src="https://images.unsplash.com/photo-1521791136064-7986c2920216"
@@ -95,18 +95,9 @@ export default function Login() {
             Report lost items, discover found belongings,
             and make someone's day better.
           </p>
-
-          <button
-            type="button"
-            onClick={handleExplorePlatform}
-            className="bg-primary text-black px-6 py-3 rounded-xl font-semibold w-fit hover:opacity-90 transition"
-          >
-            Explore Platform
-          </button>
         </div>
       </div>
 
-      {/* RIGHT SIDE */}
       <div className="flex w-full lg:w-1/2 items-center justify-center bg-background px-6">
         <form
           onSubmit={handleLogin}

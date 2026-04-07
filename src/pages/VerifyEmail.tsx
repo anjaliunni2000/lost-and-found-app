@@ -10,7 +10,7 @@ export default function VerifyEmail() {
     const email = params.get("email")
     const token = params.get("token")
 
-    fetch(`http://127.0.0.1:8000/verify-email?email=${email}&token=${token}`)
+    fetch(`${import.meta.env.VITE_API_BASE_URL}/verify-email?email=${email}&token=${token}`)
       .then(res => res.json())
       .then(data => {
 
